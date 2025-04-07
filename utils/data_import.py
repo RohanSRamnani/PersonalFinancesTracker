@@ -195,87 +195,150 @@ def extract_tables_from_pdf(filepath, source):
     Returns:
         pandas.DataFrame: Dataframe containing transaction data
     """
+    # Initialize an empty dataframe to store consolidated data
+    all_data = pd.DataFrame()
+    
+    # First try pdfplumber as it's more reliable
     try:
-        # Try using tabula first (works well for most structured tables)
-        tables = tabula.read_pdf(filepath, pages='all', multiple_tables=True)
-        
-        # Initialize an empty dataframe to store consolidated data
-        all_data = pd.DataFrame()
-        
-        if tables and len(tables) > 0:
-            # Combine all tables found
-            for table in tables:
-                if not table.empty:
-                    # Try to identify if this table contains transaction data
-                    columns = table.columns.tolist()
-                    columns_str = ' '.join([str(col).lower() for col in columns])
-                    
-                    # Check if it looks like a transaction table
-                    if any(keyword in columns_str for keyword in ['date', 'description', 'amount', 'transaction']):
-                        # Append to our combined dataframe
-                        all_data = pd.concat([all_data, table], ignore_index=True)
-            
-            if not all_data.empty:
-                # Map columns based on source
-                if source == 'wells_fargo':
-                    # Try to identify the Wells Fargo specific columns
-                    for col in all_data.columns:
-                        if 'date' in str(col).lower():
-                            all_data = all_data.rename(columns={col: 'date'})
-                        elif any(desc in str(col).lower() for desc in ['description', 'payee']):
-                            all_data = all_data.rename(columns={col: 'description'})
-                        elif 'amount' in str(col).lower():
-                            all_data = all_data.rename(columns={col: 'amount'})
-                
-                # Similar mapping for other banks...
-                elif source == 'chase':
-                    for col in all_data.columns:
-                        if 'transaction date' in str(col).lower():
-                            all_data = all_data.rename(columns={col: 'date'})
-                        elif 'description' in str(col).lower():
-                            all_data = all_data.rename(columns={col: 'description'})
-                        elif 'amount' in str(col).lower():
-                            all_data = all_data.rename(columns={col: 'amount'})
-                
-                # Add more mappings for other banks as needed
-                
-                # If we have the minimum required columns, return the data
-                required_cols = ['date', 'description', 'amount']
-                if all(col in all_data.columns for col in required_cols):
-                    return all_data
-        
-        # If tabula didn't work well, try pdfplumber as a fallback
         with pdfplumber.open(filepath) as pdf:
-            text_content = []
+            # Try to extract tables using pdfplumber first
+            found_tables = False
             for page in pdf.pages:
-                text_content.append(page.extract_text())
+                try:
+                    tables = page.extract_tables()
+                    if tables and len(tables) > 0:
+                        found_tables = True
+                        for table in tables:
+                            # Convert list of lists to DataFrame
+                            if table and len(table) > 1:  # Make sure there's a header row and data
+                                df = pd.DataFrame(table[1:], columns=table[0])
+                                
+                                # Check if it looks like a transaction table
+                                if df.shape[1] >= 3:  # At least 3 columns (date, description, amount)
+                                    # Try to identify transaction-related columns
+                                    for i, col in enumerate(df.columns):
+                                        col_lower = str(col).lower()
+                                        if 'date' in col_lower or any(month in col_lower for month in 
+                                                                   ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+                                                                    'jul', 'aug', 'sep', 'oct', 'nov', 'dec']):
+                                            df = df.rename(columns={col: 'date'})
+                                        elif any(desc in col_lower for desc in ['description', 'payee', 'merchant', 'transaction']):
+                                            df = df.rename(columns={col: 'description'})
+                                        elif any(amt in col_lower for amt in ['amount', 'sum', 'total', '$']):
+                                            df = df.rename(columns={col: 'amount'})
+                                    
+                                    # Check if we identified key columns
+                                    required_cols = ['date', 'description', 'amount']
+                                    if all(col in df.columns for col in required_cols):
+                                        all_data = pd.concat([all_data, df], ignore_index=True)
+                except:
+                    # Table extraction failed for this page, continue to next
+                    continue
             
-            full_text = '\n'.join(text_content)
-            
-            # Attempt to parse based on bank format
-            if source == 'wells_fargo':
-                # Example pattern for Wells Fargo: Date, Description, Amount
-                pattern = r'(\d{2}/\d{2}/\d{2,4})\s+(.+?)\s+([-+]?\$?\d+\.\d{2})'
-                matches = re.findall(pattern, full_text)
+            # If we couldn't find tables, try text-based extraction
+            if not found_tables or all_data.empty:
+                text_content = []
+                for page in pdf.pages:
+                    text_content.append(page.extract_text())
                 
-                if matches:
-                    data = []
-                    for match in matches:
-                        date, description, amount = match
-                        # Remove $ sign and convert to float
-                        amount = float(amount.replace('$', '').replace(',', ''))
-                        data.append({'date': date, 'description': description, 'amount': amount})
+                full_text = '\n'.join(text_content)
+                
+                # Attempt to parse based on bank format
+                if source == 'wells_fargo':
+                    # Example pattern for Wells Fargo: Date, Description, Amount
+                    pattern = r'(\d{2}/\d{2}/\d{2,4})\s+(.+?)\s+([-+]?\$?\d+\.\d{2})'
+                    matches = re.findall(pattern, full_text)
                     
-                    return pd.DataFrame(data)
-            
-            # Add similar patterns for other banks
-        
-        # If all else fails, return empty dataframe
-        return pd.DataFrame()
-        
+                    if matches:
+                        data = []
+                        for match in matches:
+                            date, description, amount = match
+                            # Remove $ sign and convert to float
+                            amount = float(amount.replace('$', '').replace(',', ''))
+                            data.append({'date': date, 'description': description, 'amount': amount})
+                        
+                        all_data = pd.DataFrame(data)
+                
+                # Add specific patterns for other banks
+                elif source == 'chase':
+                    pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.+?)\s+([-+]?\$?\d+\.\d{2})'
+                    matches = re.findall(pattern, full_text)
+                    
+                    if matches:
+                        data = []
+                        for match in matches:
+                            trans_date, post_date, description, amount = match
+                            amount = float(amount.replace('$', '').replace(',', ''))
+                            data.append({'date': trans_date, 'post_date': post_date, 
+                                        'description': description, 'amount': amount})
+                        
+                        all_data = pd.DataFrame(data)
     except Exception as e:
-        print(f"Error extracting tables from PDF: {str(e)}")
-        return pd.DataFrame()
+        print(f"pdfplumber extraction failed: {str(e)}")
+    
+    # If pdfplumber didn't work well, try tabula as a fallback
+    if all_data.empty:
+        try:
+            # Use a more conservative approach with tabula
+            try:
+                tables = tabula.read_pdf(filepath, pages='1', multiple_tables=True)
+                
+                # If successful, try more pages
+                if tables and len(tables) > 0:
+                    # Try to get tables from all pages
+                    tables = tabula.read_pdf(filepath, pages='all', multiple_tables=True)
+            except:
+                # Fallback to specific options if the generic approach fails
+                tables = tabula.read_pdf(filepath, pages='1', multiple_tables=True, 
+                                         stream=True, guess=False, lattice=True)
+            
+            if tables and len(tables) > 0:
+                # Combine all tables found
+                for table in tables:
+                    if not table.empty:
+                        # Try to identify if this table contains transaction data
+                        columns = table.columns.tolist()
+                        columns_str = ' '.join([str(col).lower() for col in columns])
+                        
+                        # Check if it looks like a transaction table
+                        if any(keyword in columns_str for keyword in ['date', 'description', 'amount', 'transaction']):
+                            # Append to our combined dataframe
+                            all_data = pd.concat([all_data, table], ignore_index=True)
+                
+                if not all_data.empty:
+                    # Map columns based on source
+                    if source == 'wells_fargo':
+                        # Try to identify the Wells Fargo specific columns
+                        for col in all_data.columns:
+                            if 'date' in str(col).lower():
+                                all_data = all_data.rename(columns={col: 'date'})
+                            elif any(desc in str(col).lower() for desc in ['description', 'payee']):
+                                all_data = all_data.rename(columns={col: 'description'})
+                            elif 'amount' in str(col).lower():
+                                all_data = all_data.rename(columns={col: 'amount'})
+                    
+                    # Similar mapping for other banks...
+                    elif source == 'chase':
+                        for col in all_data.columns:
+                            if 'transaction date' in str(col).lower():
+                                all_data = all_data.rename(columns={col: 'date'})
+                            elif 'description' in str(col).lower():
+                                all_data = all_data.rename(columns={col: 'description'})
+                            elif 'amount' in str(col).lower():
+                                all_data = all_data.rename(columns={col: 'amount'})
+        except Exception as e:
+            print(f"tabula extraction failed: {str(e)}")
+    
+    # Final check if we have the necessary columns
+    if not all_data.empty:
+        required_cols = ['date', 'description', 'amount']
+        missing_cols = [col for col in required_cols if col not in all_data.columns]
+        
+        if not missing_cols:
+            return all_data
+    
+    # If all else fails, return empty dataframe
+    return pd.DataFrame()
 
 def detect_file_type(filepath):
     """
@@ -313,20 +376,41 @@ def read_file_to_preview(filepath, num_rows=5):
             preview = pd.read_csv(filepath, nrows=num_rows)
             return preview
         elif file_type == 'pdf':
-            # For PDF files, try to extract a table preview
-            tables = tabula.read_pdf(filepath, pages='1', multiple_tables=True)
-            if tables and len(tables) > 0:
-                # Return the first table found
-                return tables[0].head(num_rows)
-            else:
-                # If no tables found, return a preview of text content
+            # Start with pdfplumber for text extraction which is more reliable
+            try:
                 with pdfplumber.open(filepath) as pdf:
                     if len(pdf.pages) > 0:
+                        # First try table extraction with pdfplumber
+                        try:
+                            tables = pdf.pages[0].extract_tables()
+                            if tables and len(tables) > 0:
+                                # Use the first table
+                                table = tables[0]
+                                if len(table) > 1:  # Has header and data
+                                    df = pd.DataFrame(table[1:num_rows+1], columns=table[0])
+                                    return df
+                        except:
+                            pass  # Fall back to text extraction if tables fail
+                        
+                        # If table extraction fails, use text
                         text = pdf.pages[0].extract_text()
-                        # Create a simple DataFrame with the first few lines of text
-                        lines = text.split('\n')[:num_rows]
-                        return pd.DataFrame({'PDF Content': lines})
+                        if text:
+                            lines = text.split('\n')[:num_rows]
+                            return pd.DataFrame({'PDF Content': lines})
+            except Exception as pdf_err:
+                print(f"pdfplumber preview failed: {str(pdf_err)}")
             
+            # Try tabula as a fallback with more conservative settings
+            try:
+                # Use safer settings to avoid CMYK color issues
+                tables = tabula.read_pdf(filepath, pages='1', guess=False, 
+                                         stream=True, multiple_tables=True)
+                if tables and len(tables) > 0 and not tables[0].empty:
+                    return tables[0].head(num_rows)
+            except Exception as tabula_err:
+                print(f"tabula preview failed: {str(tabula_err)}")
+            
+            # If both methods fail, just indicate it's a PDF
             return pd.DataFrame({"Preview": ["PDF file detected. Import to process."]})
         else:
             return pd.DataFrame({"Error": ["Unsupported file format. Please use CSV or PDF."]})
