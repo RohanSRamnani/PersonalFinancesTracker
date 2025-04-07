@@ -3,6 +3,9 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
+from utils.database import save_budget as db_save_budget
+from utils.database import load_budget as db_load_budget
+from utils.database import get_budget_months as db_get_budget_months
 
 def create_budget(categories, amounts):
     """
@@ -22,41 +25,60 @@ def create_budget(categories, amounts):
     
     return budget_df
 
-def save_budget(budget_df, filepath='budget.csv'):
+def save_budget(budget_df, month, db_path='finance_data.db'):
     """
-    Save budget to CSV file
+    Save budget to database
     
     Parameters:
-        budget_df (pandas.DataFrame): Budget dataframe
-        filepath (str): Path to save the budget CSV
+        budget_df (pandas.DataFrame): Budget dataframe with columns 'category' and 'amount'
+        month (str): Month in YYYY-MM format
+        db_path (str): Path to the SQLite database
     
     Returns:
         bool: True if successful, False otherwise
     """
-    try:
-        budget_df.to_csv(filepath, index=False)
-        return True
-    except Exception as e:
-        print(f"Error saving budget: {str(e)}")
+    # Rename budget_amount to amount if it exists
+    if 'budget_amount' in budget_df.columns and 'amount' not in budget_df.columns:
+        budget_df = budget_df.rename(columns={'budget_amount': 'amount'})
+    
+    # Make sure we have the required columns
+    if 'category' not in budget_df.columns or 'amount' not in budget_df.columns:
+        print("Error: Budget dataframe must have 'category' and 'amount' columns")
         return False
+    
+    # Save to database
+    return db_save_budget(budget_df, month, db_path)
 
-def load_budget(filepath='budget.csv'):
+def load_budget(month, db_path='finance_data.db'):
     """
-    Load budget from CSV file
+    Load budget from database
     
     Parameters:
-        filepath (str): Path to the budget CSV file
+        month (str): Month in YYYY-MM format
+        db_path (str): Path to the SQLite database
     
     Returns:
-        pandas.DataFrame: Budget dataframe or empty dataframe if file not found
+        pandas.DataFrame: Budget dataframe or empty dataframe if not found
     """
-    try:
-        return pd.read_csv(filepath)
-    except FileNotFoundError:
-        return pd.DataFrame(columns=['category', 'budget_amount'])
-    except Exception as e:
-        print(f"Error loading budget: {str(e)}")
-        return pd.DataFrame(columns=['category', 'budget_amount'])
+    budget_df = db_load_budget(month, db_path)
+    
+    # Rename columns if needed
+    if 'amount' in budget_df.columns and 'budget_amount' not in budget_df.columns:
+        budget_df = budget_df.rename(columns={'amount': 'budget_amount'})
+    
+    return budget_df
+
+def get_budget_months(db_path='finance_data.db'):
+    """
+    Get a list of months that have budget data
+    
+    Parameters:
+        db_path (str): Path to the SQLite database
+    
+    Returns:
+        list: List of months in YYYY-MM format
+    """
+    return db_get_budget_months(db_path)
 
 def compare_budget_vs_actual(transactions_df, budget_df, month=None):
     """

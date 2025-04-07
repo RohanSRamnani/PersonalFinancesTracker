@@ -4,7 +4,7 @@ import os
 from utils.database import load_from_database
 from utils.categorization import get_category_list
 from utils.budgeting import (
-    create_budget, save_budget, load_budget,
+    create_budget, save_budget, load_budget, get_budget_months,
     compare_budget_vs_actual, plot_budget_comparison,
     calculate_budget_progress, plot_budget_progress
 )
@@ -21,9 +21,6 @@ st.title("Budget Planning and Tracking")
 # Initialize database path in session state if not already there
 if 'db_path' not in st.session_state:
     st.session_state.db_path = 'finance_data.db'
-
-# Budget file path
-budget_file = 'budget.csv'
 
 def main():
     # Load all transactions
@@ -43,19 +40,30 @@ def main():
         create_edit_budget()
 
 def show_budget_overview(transactions):
-    # Load current budget
-    budget_df = load_budget(budget_file)
+    # Get all available months with budgets
+    budget_months = get_budget_months(st.session_state.db_path)
     
-    if budget_df.empty:
-        st.info("No budget has been created yet. Use the 'Create/Edit Budget' tab to set up your budget.")
-        return
+    # Get months from transactions
+    transaction_months = sorted(transactions['date'].dt.strftime('%Y-%m').unique().tolist())
+    current_month = datetime.datetime.now().strftime('%Y-%m')
     
     # Sidebar controls
     st.sidebar.header("Budget Controls")
     
-    # Month selector
-    all_months = sorted(transactions['date'].dt.strftime('%Y-%m').unique().tolist())
-    current_month = datetime.datetime.now().strftime('%Y-%m')
+    if not budget_months:
+        st.info("No budget has been created yet. Use the 'Create/Edit Budget' tab to set up your budget.")
+        
+        # Still allow selecting a month for potential budget creation
+        default_month_index = transaction_months.index(current_month) if current_month in transaction_months else len(transaction_months) - 1
+        selected_month = st.sidebar.selectbox(
+            "Select Month for Budget Creation",
+            transaction_months,
+            index=default_month_index
+        )
+        return
+    
+    # Month selector - combine budget months and transaction months
+    all_months = sorted(list(set(budget_months + transaction_months)))
     
     # Default to current month if available, otherwise most recent
     default_month_index = all_months.index(current_month) if current_month in all_months else len(all_months) - 1
@@ -64,6 +72,9 @@ def show_budget_overview(transactions):
         all_months,
         index=default_month_index
     )
+    
+    # Load budget for the selected month
+    budget_df = load_budget(selected_month, st.session_state.db_path)
     
     # Budget overview
     st.header(f"Budget Overview for {selected_month}")
@@ -139,11 +150,32 @@ def create_edit_budget():
     # Get the list of categories
     categories = get_category_list()
     
-    # Check if budget already exists
-    existing_budget = load_budget(budget_file)
+    # Get transaction months for selection
+    transactions = load_from_database(st.session_state.db_path)
+    all_months = sorted(transactions['date'].dt.strftime('%Y-%m').unique().tolist())
+    current_month = datetime.datetime.now().strftime('%Y-%m')
     
-    if not existing_budget.empty:
-        st.header("Edit Existing Budget")
+    # Default to current month if available, otherwise most recent
+    if all_months:
+        default_month_index = all_months.index(current_month) if current_month in all_months else len(all_months) - 1
+    else:
+        default_month_index = 0
+        all_months = [current_month]  # Use current month if no transaction data
+    
+    # Add month selector for budget
+    selected_month = st.selectbox(
+        "Select Month for Budget",
+        all_months,
+        index=default_month_index
+    )
+    
+    # Get budget months to check if one exists for the selected month
+    budget_months = get_budget_months(st.session_state.db_path)
+    
+    # Check if budget already exists for the selected month
+    if selected_month in budget_months:
+        existing_budget = load_budget(selected_month, st.session_state.db_path)
+        st.header(f"Edit Budget for {selected_month}")
         
         # Convert existing budget to dictionary for easier handling
         existing_budget_dict = dict(zip(existing_budget['category'], existing_budget['budget_amount']))
@@ -172,13 +204,13 @@ def create_edit_budget():
             # Create new budget dataframe
             new_budget = create_budget(list(budget_amounts.keys()), list(budget_amounts.values()))
             
-            # Save to file
-            if save_budget(new_budget, budget_file):
-                st.success("Budget updated successfully!")
+            # Save to database
+            if save_budget(new_budget, selected_month, st.session_state.db_path):
+                st.success(f"Budget for {selected_month} updated successfully!")
             else:
                 st.error("Failed to save budget.")
     else:
-        st.header("Create New Budget")
+        st.header(f"Create New Budget for {selected_month}")
         
         # Create input fields for each category
         budget_amounts = {}
@@ -200,23 +232,44 @@ def create_edit_budget():
             # Create new budget dataframe
             new_budget = create_budget(list(budget_amounts.keys()), list(budget_amounts.values()))
             
-            # Save to file
-            if save_budget(new_budget, budget_file):
-                st.success("Budget created successfully!")
+            # Save to database
+            if save_budget(new_budget, selected_month, st.session_state.db_path):
+                st.success(f"Budget for {selected_month} created successfully!")
             else:
                 st.error("Failed to save budget.")
     
-    # Option to reset budget
-    st.markdown("---")
-    if st.button("Reset Budget (Delete All)"):
-        if os.path.exists(budget_file):
+    # Show existing budgets
+    budget_months = get_budget_months(st.session_state.db_path)
+    if budget_months:
+        st.markdown("---")
+        st.subheader("Existing Budgets")
+        st.write("You have budgets for the following months:")
+        for month in budget_months:
+            st.write(f"- {month}")
+    
+    # Option to delete a specific budget
+    if budget_months:
+        st.markdown("---")
+        st.subheader("Delete Budget")
+        delete_month = st.selectbox(
+            "Select Month to Delete",
+            budget_months
+        )
+        
+        if st.button(f"Delete Budget for {delete_month}"):
+            # This will delete the budget for the selected month
+            import sqlite3
             try:
-                os.remove(budget_file)
-                st.success("Budget has been reset. Create a new budget above.")
-            except:
-                st.error("Failed to reset budget.")
-        else:
-            st.info("No budget file exists to reset.")
+                conn = sqlite3.connect(st.session_state.db_path)
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM budgets WHERE month = ?", (delete_month,))
+                conn.commit()
+                conn.close()
+                st.success(f"Budget for {delete_month} has been deleted.")
+                # Refresh the page to show the changes
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to delete budget: {str(e)}")
 
 if __name__ == "__main__":
     main()
