@@ -2,6 +2,9 @@
 headless = true
 address = "0.0.0.0"
 port = 5000
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 100
 
 [theme]
 primaryColor = "#4CAF50"

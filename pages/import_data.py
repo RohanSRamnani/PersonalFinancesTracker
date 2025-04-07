@@ -11,6 +11,16 @@ st.set_page_config(
     layout="wide"
 )
 
+# Create temp_uploads directory if it doesn't exist
+import os
+if not os.path.exists('temp_uploads'):
+    os.makedirs('temp_uploads', exist_ok=True)
+    # Set permissions to ensure we can write files
+    try:
+        os.chmod('temp_uploads', 0o777)
+    except:
+        pass
+
 st.title("Import Financial Data")
 
 # Initialize database path in session state if not already there
@@ -40,7 +50,10 @@ def main():
     if uploaded_file is not None:
         try:
             # Save uploaded file temporarily
-            temp_file_path = f"temp_{uploaded_file.name}"
+            import uuid
+            # Generate a unique ID to avoid name conflicts
+            unique_id = uuid.uuid4().hex
+            temp_file_path = f"temp_uploads/{unique_id}_{uploaded_file.name}"
             with open(temp_file_path, "wb") as temp_file:
                 temp_file.write(uploaded_file.getvalue())
             
