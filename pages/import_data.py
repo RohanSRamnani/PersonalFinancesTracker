@@ -34,6 +34,9 @@ def main():
     # File upload
     uploaded_file = st.file_uploader("Upload statement file", type=["csv", "pdf"])
     
+    # Initialize temp_file_path outside of try/except blocks to avoid unbound variable issues
+    temp_file_path = None
+    
     if uploaded_file is not None:
         try:
             # Save uploaded file temporarily
@@ -87,12 +90,42 @@ def main():
             else:
                 confirm_import = True
             
+            # Add page selection for PDF files
+            page_numbers = None
+            if file_type == 'pdf':
+                st.subheader("PDF Options")
+                page_option = st.radio(
+                    "Select pages to extract transactions from:",
+                    ["All Pages", "Specific Pages"],
+                    index=0
+                )
+                
+                if page_option == "Specific Pages":
+                    page_input = st.text_input(
+                        "Enter page numbers (comma-separated, e.g., 1,3,5 or range like 2-4):",
+                        value="3"  # Default to page 3 since that's often where transaction data is
+                    )
+                    
+                    if page_input:
+                        # Parse the page input (handles both comma-separated values and ranges)
+                        try:
+                            page_numbers = []
+                            for part in page_input.split(','):
+                                if '-' in part:
+                                    start, end = map(int, part.split('-'))
+                                    page_numbers.extend(range(start, end + 1))
+                                else:
+                                    page_numbers.append(int(part))
+                        except ValueError:
+                            st.warning("Invalid page format. Using default (all pages).")
+                            page_numbers = None
+            
             # Import button
             if st.button("Import Data") and confirm_import:
                 with st.spinner("Importing and processing data..."):
                     try:
                         # Import, categorize, and save to database
-                        df = import_statement(temp_file_path, selected_source)
+                        df = import_statement(temp_file_path, selected_source, page_numbers=page_numbers)
                         
                         if df.empty:
                             st.error("No transactions were found in the file. Please check the file format and try again.")
@@ -129,12 +162,12 @@ def main():
                 st.warning("Please confirm that the preview looks good by checking the box above.")
             
             # Clean up temporary file
-            if os.path.exists(temp_file_path):
+            if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
         
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            if os.path.exists(temp_file_path):
+            if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
     
     # Option to view existing data

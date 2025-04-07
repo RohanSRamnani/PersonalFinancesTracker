@@ -8,13 +8,14 @@ import PyPDF2
 import tabula
 import re
 
-def import_statement(filepath, source):
+def import_statement(filepath, source, page_numbers=None):
     """
     Import a statement from any source and standardize the format
     
     Parameters:
         filepath (str): Path to the statement file
         source (str): One of 'wells_fargo', 'chase', 'bank_of_america', 'apple_pay', 'schwab'
+        page_numbers (list, optional): Specific pages to extract from PDF. Default is None (all pages).
     
     Returns:
         pandas.DataFrame: Standardized dataframe with transactions
@@ -69,7 +70,7 @@ def import_statement(filepath, source):
         
         elif file_type == 'pdf':
             # Handle PDF files
-            df = extract_tables_from_pdf(filepath, source)
+            df = extract_tables_from_pdf(filepath, source, page_numbers)
             if df.empty:
                 raise ValueError(f"Could not extract transactions from the PDF file for {source}")
         
@@ -184,13 +185,14 @@ def detect_source_from_header(filepath):
         print(f"Error detecting source: {str(e)}")
         return None
 
-def extract_tables_from_pdf(filepath, source):
+def extract_tables_from_pdf(filepath, source, page_numbers=None):
     """
     Extract tables from PDF statements
     
     Parameters:
         filepath (str): Path to the PDF file
         source (str): One of 'wells_fargo', 'chase', 'bank_of_america', 'apple_pay', 'schwab'
+        page_numbers (list, optional): Specific pages to extract. Default is None (all pages).
     
     Returns:
         pandas.DataFrame: Dataframe containing transaction data
@@ -204,9 +206,18 @@ def extract_tables_from_pdf(filepath, source):
         data = []
         
         with pdfplumber.open(filepath) as pdf:
+            # Filter pages if specific page numbers were provided
+            selected_pages = pdf.pages
+            if page_numbers:
+                # Convert from 1-based page numbers (user input) to 0-based indices
+                page_indices = [p-1 for p in page_numbers if 0 < p <= len(pdf.pages)]
+                if page_indices:  # Only use filtered pages if valid page numbers were provided
+                    selected_pages = [pdf.pages[idx] for idx in page_indices]
+                    print(f"Extracting from {len(selected_pages)} specific pages: {[i+1 for i in page_indices]}")
+            
             # Try to extract tables using pdfplumber first
             found_tables = False
-            for page in pdf.pages:
+            for page in selected_pages:
                 try:
                     tables = page.extract_tables()
                     if tables and len(tables) > 0:
@@ -241,8 +252,23 @@ def extract_tables_from_pdf(filepath, source):
             # If we couldn't find tables, try text-based extraction
             if not found_tables or all_data.empty:
                 text_content = []
-                for page in pdf.pages:
-                    text_content.append(page.extract_text())
+                
+                # Use the same page filtering as above for text extraction
+                if page_numbers:
+                    # Convert from 1-based page numbers (user input) to 0-based indices
+                    page_indices = [p-1 for p in page_numbers if 0 < p <= len(pdf.pages)]
+                    if page_indices:  # Only use filtered pages if valid page numbers were provided
+                        text_pages = [pdf.pages[idx] for idx in page_indices]
+                        print(f"Extracting text from {len(text_pages)} specific pages: {[i+1 for i in page_indices]}")
+                    else:
+                        text_pages = pdf.pages
+                else:
+                    text_pages = pdf.pages
+                
+                for page in text_pages:
+                    extracted_text = page.extract_text()
+                    if extracted_text:
+                        text_content.append(extracted_text)
                 
                 full_text = '\n'.join(text_content)
                 
@@ -271,24 +297,96 @@ def extract_tables_from_pdf(filepath, source):
                         # Extract the account activity section
                         activity_text = account_activity_match.group(1)
                         
-                        # Pattern for Chase transaction date, description, and amount
-                        # Format: MM/DD followed by description and then amount (positive or negative)
-                        pattern = r'(\d{2}/\d{2})\s+(.*?)\s+([-+]?\d+\.\d{2})'
-                        trans_matches = re.findall(pattern, activity_text)
+                        # Based on the screenshot format, first look for sections like "PAYMENTS AND OTHER CREDITS", "PURCHASE", etc.
+                        sections = []
                         
-                        if trans_matches:
-                            data = []
+                        # Find all section headers and their content
+                        section_headers = ["PAYMENTS AND OTHER CREDITS", "PURCHASE", "CASH ADVANCES", "FEES CHARGED", "INTEREST CHARGED"]
+                        
+                        for i, header in enumerate(section_headers):
+                            start_pos = activity_text.find(header)
+                            if start_pos >= 0:
+                                # Find the end of this section (next section or end of activity text)
+                                end_pos = len(activity_text)
+                                for next_header in section_headers[i+1:]:
+                                    next_pos = activity_text.find(next_header, start_pos + 1)
+                                    if next_pos > start_pos:
+                                        end_pos = next_pos
+                                        break
+                                
+                                # Extract this section
+                                section_text = activity_text[start_pos:end_pos]
+                                sections.append((header, section_text))
+                        
+                        # Process each section
+                        data = []
+                        for section_name, section_text in sections:
+                            # Pattern for Chase format from screenshot: Date (MM/DD) + Description + Amount
+                            # We'll use a more specific pattern based on the Chase statement format
+                            pattern = r'(\d{2}/\d{2})\s+(.*?)\s+([-+]?\d+\.\d{2})'
+                            trans_matches = re.findall(pattern, section_text)
+                            
                             for match in trans_matches:
                                 date, description, amount = match
-                                # Convert amount to float - Chase typically shows expenses as positive
-                                # but we want them as negative in our system
+                                
+                                # Skip header rows
+                                if 'Date of Transaction' in description:
+                                    continue
+                                
+                                # Clean up description and amount
+                                description = re.sub(r'\s+', ' ', description).strip()
                                 amount_float = float(amount.replace(',', ''))
                                 
-                                # Check if this is a payment, credit, or purchase
-                                # Don't invert payments (detect by description)
-                                is_payment = 'PAYMENT' in description.upper() or 'CREDIT' in description.upper()
-                                if not is_payment:
-                                    amount_float = -amount_float  # Invert purchase amounts
+                                # Handle sign based on section context
+                                if section_name == "PAYMENTS AND OTHER CREDITS":
+                                    # These are payments or credits, should be positive (money in)
+                                    amount_float = abs(amount_float)
+                                elif section_name in ["PURCHASE", "CASH ADVANCES", "FEES CHARGED", "INTEREST CHARGED"]:
+                                    # These are expenses, should be negative (money out)
+                                    amount_float = -abs(amount_float)
+                                
+                                data.append({
+                                    'date': date, 
+                                    'description': description, 
+                                    'amount': amount_float
+                                })
+                        
+                        # If we found any transactions, create the dataframe
+                        if data:
+                            all_data = pd.DataFrame(data)
+                    
+                    # If section-based extraction didn't work, try a simpler pattern
+                    if all_data.empty:
+                        # Extract the date format MM/DD from the statement
+                        date_pattern = r'(\d{2}/\d{2})'
+                        
+                        # Look for lines with date at beginning, merchant/description in middle, and amount at end
+                        # Format matches what we see in the screenshot
+                        pattern = r'(\d{2}/\d{2})\s+([A-Z0-9].*?)\s+([-+]?\d+\.\d{2})'
+                        matches = re.findall(pattern, full_text)
+                        
+                        if matches:
+                            data = []
+                            for match in matches:
+                                date, description, amount = match
+                                
+                                # Skip if this is a header row
+                                if 'DATE OF TRANSACTION' in description.upper():
+                                    continue
+                                
+                                # Convert amount to float
+                                amount_float = float(amount.replace(',', ''))
+                                
+                                # Determine if this is a payment based on description
+                                is_payment = ('PAYMENT' in description.upper() or 
+                                              'CREDIT' in description.upper() or 
+                                              'REFUND' in description.upper())
+                                
+                                # Set the sign convention
+                                if is_payment:
+                                    amount_float = abs(amount_float)  # Payments should be positive
+                                else:
+                                    amount_float = -abs(amount_float)  # Purchases should be negative
                                 
                                 data.append({
                                     'date': date, 
@@ -297,63 +395,98 @@ def extract_tables_from_pdf(filepath, source):
                                 })
                             
                             all_data = pd.DataFrame(data)
-                    
-                    # If we couldn't find the ACCOUNT ACTIVITY section, try a more generic approach
-                    if all_data.empty:
-                        # Look for date (MM/DD), description, and dollar amount
-                        pattern = r'(\d{2}/\d{2})\s+([A-Z0-9].*?)\s+([-+]?\$?\d+\.\d{2})'
-                        matches = re.findall(pattern, full_text)
-                        
-                        if matches:
-                            data = []
-                            for match in matches:
-                                date, description, amount = match
-                                amount = float(amount.replace('$', '').replace(',', ''))
-                                data.append({'date': date, 'description': description, 'amount': amount})
-                            
-                            all_data = pd.DataFrame(data)
                 
                 # Bank of America - look for data under "Transactions" section
                 elif source == 'bank_of_america':
-                    # Find the Transactions section
-                    transactions_match = re.search(r'Transactions(.*?)(?:Interest\s+Charged|Totals\s+Year-to-Date)', full_text, re.DOTALL)
+                    # Find the Transactions section - based on the screenshot format
+                    transactions_match = re.search(r'Transactions(.*?)(?:Interest\s+Charged|Totals\s+Year-to-Date|^\s*$)', full_text, re.DOTALL | re.MULTILINE)
                     
                     if transactions_match:
                         # Extract the transactions section
                         transactions_text = transactions_match.group(1)
                         
-                        # Pattern for BoA transaction date, posting date, description, and amount
-                        # Format: Transaction Date, Posting Date, Description, Amount
-                        pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.*?)\s+(\d+)\s+\d+\s+([-+]?\d+\.\d{2})'
+                        # For Bank of America, the transaction and posting date pattern is very specific
+                        # Based on the screenshot format MM/DD followed by MM/DD then description
+                        pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+([^\n]+?)(?:\s+(\d+)\s+\d+\s+|)(-?\d+\.\d{2})'
                         trans_matches = re.findall(pattern, transactions_text)
-                        
-                        # If the standard pattern doesn't work, try a simplified pattern
-                        if not trans_matches:
-                            pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.*?)\s+([-+]?\d+\.\d{2})'
-                            trans_matches = re.findall(pattern, transactions_text)
                         
                         if trans_matches:
                             data = []
                             for match in trans_matches:
                                 if len(match) == 5:  # Full pattern with reference number
                                     trans_date, post_date, description, ref_num, amount = match
+                                    # Skip if this seems to be a header row
+                                    if 'Transaction' in description and 'Date' in description:
+                                        continue
                                 else:  # Simplified pattern without reference number
                                     trans_date, post_date, description, amount = match
                                 
-                                # Convert amount to float
-                                amount_float = float(amount.replace(',', ''))
+                                # Clean the description - remove extra whitespace and fix formatting
+                                description = re.sub(r'\s+', ' ', description).strip()
                                 
-                                # Check if this is a payment or credit
-                                is_payment = 'PAYMENT' in description.upper() or 'CREDIT' in description.upper()
-                                if not is_payment and amount_float > 0:
-                                    amount_float = -amount_float  # Invert purchase amounts
-                                
-                                data.append({
-                                    'date': trans_date, 
-                                    'post_date': post_date,
-                                    'description': description.strip(), 
-                                    'amount': amount_float
-                                })
+                                try:
+                                    # Convert amount to float, handling negative values correctly
+                                    # If amount has a leading minus sign, it's already negative
+                                    amount_clean = amount.replace(',', '')
+                                    amount_float = float(amount_clean)
+                                    
+                                    # In Bank of America statements:
+                                    # - Payments/Credits usually show with a minus sign preceding the amount
+                                    # - Purchases/Debits usually show as positive amounts
+                                    # We want payments as positive (money in) and purchases as negative (money out)
+                                    
+                                    # Check for payment/credit or purchase based on keywords and section headings
+                                    is_payment = any(keyword in description.upper() for keyword in [
+                                        'PAYMENT', 'CREDIT', 'DEPOSIT', 'REFUND', 'RETURN'
+                                    ]) or amount_float < 0
+                                    
+                                    # For payments/credits, make sure they're positive
+                                    if is_payment:
+                                        amount_float = abs(amount_float)
+                                    # For purchases/debits, make sure they're negative
+                                    elif amount_float > 0:
+                                        amount_float = -amount_float
+                                    
+                                    data.append({
+                                        'date': trans_date, 
+                                        'post_date': post_date,
+                                        'description': description, 
+                                        'amount': amount_float
+                                    })
+                                except ValueError:
+                                    # Skip lines that can't be parsed correctly
+                                    continue
+                                    
+                        # If we couldn't find transactions with the specific pattern, try a more generic approach
+                        # This might catch the data from the screenshot format even if the section headers are different
+                        if not data:
+                            # Look for patterns that match date-date-description-amount
+                            pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.+?)\s+(-?\d+\.\d{2})'
+                            matches = re.findall(pattern, full_text)
+                            
+                            if matches:
+                                data = []
+                                for match in matches:
+                                    trans_date, post_date, description, amount = match
+                                    
+                                    # Clean up and convert amount to float
+                                    amount_float = float(amount.replace(',', ''))
+                                    
+                                    # Determine if this is a payment based on context
+                                    is_payment = 'PAYMENT' in description.upper() or amount_float < 0
+                                    
+                                    # Standardize the sign convention
+                                    if is_payment:
+                                        amount_float = abs(amount_float)  # Payments are positive
+                                    elif amount_float > 0:
+                                        amount_float = -amount_float      # Purchases are negative
+                                    
+                                    data.append({
+                                        'date': trans_date,
+                                        'post_date': post_date,
+                                        'description': description.strip(),
+                                        'amount': amount_float
+                                    })
                             
                             all_data = pd.DataFrame(data)
     except Exception as e:
@@ -362,17 +495,24 @@ def extract_tables_from_pdf(filepath, source):
     # If pdfplumber didn't work well, try tabula as a fallback
     if all_data.empty:
         try:
+            # Determine which pages to process
+            pages_str = '1'  # Default to first page
+            if page_numbers:
+                # Format page numbers for tabula (comma-separated string)
+                pages_str = ','.join([str(p) for p in page_numbers])
+                print(f"Using specific pages with tabula: {pages_str}")
+            
             # Use a more conservative approach with tabula
             try:
-                tables = tabula.read_pdf(filepath, pages='1', multiple_tables=True)
+                tables = tabula.read_pdf(filepath, pages=pages_str, multiple_tables=True)
                 
-                # If successful, try more pages
-                if tables and len(tables) > 0:
+                # If successful and no specific pages were requested, try all pages
+                if tables and len(tables) > 0 and not page_numbers:
                     # Try to get tables from all pages
                     tables = tabula.read_pdf(filepath, pages='all', multiple_tables=True)
             except:
                 # Fallback to specific options if the generic approach fails
-                tables = tabula.read_pdf(filepath, pages='1', multiple_tables=True, 
+                tables = tabula.read_pdf(filepath, pages=pages_str, multiple_tables=True, 
                                          stream=True, guess=False, lattice=True)
             
             if tables and len(tables) > 0:
