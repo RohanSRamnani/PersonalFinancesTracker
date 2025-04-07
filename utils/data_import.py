@@ -200,6 +200,9 @@ def extract_tables_from_pdf(filepath, source):
     
     # First try pdfplumber as it's more reliable
     try:
+        # Initialize data variable to prevent "possibly unbound" error
+        data = []
+        
         with pdfplumber.open(filepath) as pdf:
             # Try to extract tables using pdfplumber first
             found_tables = False
@@ -259,20 +262,100 @@ def extract_tables_from_pdf(filepath, source):
                         
                         all_data = pd.DataFrame(data)
                 
-                # Add specific patterns for other banks
+                # Chase Credit Card statements - look for data under ACCOUNT ACTIVITY section
                 elif source == 'chase':
-                    pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.+?)\s+([-+]?\$?\d+\.\d{2})'
-                    matches = re.findall(pattern, full_text)
+                    # First try to find the "ACCOUNT ACTIVITY" section
+                    account_activity_match = re.search(r'ACCOUNT\s+ACTIVITY(.*?)(?:INTEREST\s+CHARGED|FEES\s+CHARGED|TOTALS\s+YEAR-TO-DATE)', full_text, re.DOTALL)
                     
-                    if matches:
-                        data = []
-                        for match in matches:
-                            trans_date, post_date, description, amount = match
-                            amount = float(amount.replace('$', '').replace(',', ''))
-                            data.append({'date': trans_date, 'post_date': post_date, 
-                                        'description': description, 'amount': amount})
+                    if account_activity_match:
+                        # Extract the account activity section
+                        activity_text = account_activity_match.group(1)
                         
-                        all_data = pd.DataFrame(data)
+                        # Pattern for Chase transaction date, description, and amount
+                        # Format: MM/DD followed by description and then amount (positive or negative)
+                        pattern = r'(\d{2}/\d{2})\s+(.*?)\s+([-+]?\d+\.\d{2})'
+                        trans_matches = re.findall(pattern, activity_text)
+                        
+                        if trans_matches:
+                            data = []
+                            for match in trans_matches:
+                                date, description, amount = match
+                                # Convert amount to float - Chase typically shows expenses as positive
+                                # but we want them as negative in our system
+                                amount_float = float(amount.replace(',', ''))
+                                
+                                # Check if this is a payment, credit, or purchase
+                                # Don't invert payments (detect by description)
+                                is_payment = 'PAYMENT' in description.upper() or 'CREDIT' in description.upper()
+                                if not is_payment:
+                                    amount_float = -amount_float  # Invert purchase amounts
+                                
+                                data.append({
+                                    'date': date, 
+                                    'description': description.strip(), 
+                                    'amount': amount_float
+                                })
+                            
+                            all_data = pd.DataFrame(data)
+                    
+                    # If we couldn't find the ACCOUNT ACTIVITY section, try a more generic approach
+                    if all_data.empty:
+                        # Look for date (MM/DD), description, and dollar amount
+                        pattern = r'(\d{2}/\d{2})\s+([A-Z0-9].*?)\s+([-+]?\$?\d+\.\d{2})'
+                        matches = re.findall(pattern, full_text)
+                        
+                        if matches:
+                            data = []
+                            for match in matches:
+                                date, description, amount = match
+                                amount = float(amount.replace('$', '').replace(',', ''))
+                                data.append({'date': date, 'description': description, 'amount': amount})
+                            
+                            all_data = pd.DataFrame(data)
+                
+                # Bank of America - look for data under "Transactions" section
+                elif source == 'bank_of_america':
+                    # Find the Transactions section
+                    transactions_match = re.search(r'Transactions(.*?)(?:Interest\s+Charged|Totals\s+Year-to-Date)', full_text, re.DOTALL)
+                    
+                    if transactions_match:
+                        # Extract the transactions section
+                        transactions_text = transactions_match.group(1)
+                        
+                        # Pattern for BoA transaction date, posting date, description, and amount
+                        # Format: Transaction Date, Posting Date, Description, Amount
+                        pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.*?)\s+(\d+)\s+\d+\s+([-+]?\d+\.\d{2})'
+                        trans_matches = re.findall(pattern, transactions_text)
+                        
+                        # If the standard pattern doesn't work, try a simplified pattern
+                        if not trans_matches:
+                            pattern = r'(\d{2}/\d{2})\s+(\d{2}/\d{2})\s+(.*?)\s+([-+]?\d+\.\d{2})'
+                            trans_matches = re.findall(pattern, transactions_text)
+                        
+                        if trans_matches:
+                            data = []
+                            for match in trans_matches:
+                                if len(match) == 5:  # Full pattern with reference number
+                                    trans_date, post_date, description, ref_num, amount = match
+                                else:  # Simplified pattern without reference number
+                                    trans_date, post_date, description, amount = match
+                                
+                                # Convert amount to float
+                                amount_float = float(amount.replace(',', ''))
+                                
+                                # Check if this is a payment or credit
+                                is_payment = 'PAYMENT' in description.upper() or 'CREDIT' in description.upper()
+                                if not is_payment and amount_float > 0:
+                                    amount_float = -amount_float  # Invert purchase amounts
+                                
+                                data.append({
+                                    'date': trans_date, 
+                                    'post_date': post_date,
+                                    'description': description.strip(), 
+                                    'amount': amount_float
+                                })
+                            
+                            all_data = pd.DataFrame(data)
     except Exception as e:
         print(f"pdfplumber extraction failed: {str(e)}")
     
