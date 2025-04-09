@@ -127,7 +127,11 @@ def main():
     end_idx = min(start_idx + rows_per_page, len(filtered_transactions))
     
     # Display paginated transactions
-    st.dataframe(display_df.iloc[start_idx:end_idx][['id', 'date', 'description', 'amount', 'category', 'source']], use_container_width=True)
+    # Set the ID as the index but don't show it as a column
+    display_subset = display_df.iloc[start_idx:end_idx].copy()
+    display_subset = display_subset.set_index('id')
+    display_subset.index.name = 'ID'  # Rename the index
+    st.dataframe(display_subset[['date', 'description', 'amount', 'category', 'source']], use_container_width=True)
     
     # Edit transaction section
     st.markdown("---")
