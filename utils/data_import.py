@@ -65,20 +65,122 @@ def import_statement(filepath, source, page_numbers=None):
             # First attempt - try standard conversion
             df['date'] = pd.to_datetime(df['date'])
         except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
-            # Handle special cases like MM/DD without year
-            current_year = datetime.now().year
+            print("Initial date parsing failed, attempting to fix date formats...")
             
-            # Check if we have dates in MM/DD format without year
+            # Try to find the year from:
+            # 1. First, check the filename
+            # 2. Next, check if sheet name might have year information
+            # 3. If all else fails, use current year
+            year = None
+            
+            # 1. Check if we can extract year from filename
+            if os.path.basename(filepath).startswith('20') and len(os.path.basename(filepath)) >= 4:
+                try:
+                    year = int(os.path.basename(filepath)[:4])
+                    print(f"Extracted year from filename: {year}")
+                except ValueError:
+                    pass
+            
+            # 2. See if the first row contains a cell that could be a year (sheet name or header)
+            if year is None and 'Sheet' in df.columns:
+                sheet_name = df['Sheet'].iloc[0] if not pd.isna(df['Sheet'].iloc[0]) else None
+                if sheet_name and str(sheet_name).startswith('20') and len(str(sheet_name)) >= 4:
+                    try:
+                        year = int(str(sheet_name)[:4])
+                        print(f"Extracted year from sheet name: {year}")
+                    except ValueError:
+                        pass
+            
+            # 3. Check if there's any column name that looks like a year
+            if year is None:
+                for col in df.columns:
+                    if str(col).startswith('20') and len(str(col)) >= 4:
+                        try:
+                            year = int(str(col)[:4])
+                            print(f"Extracted year from column name: {year}")
+                            break
+                        except ValueError:
+                            pass
+            
+            # 4. Fallback to current year if we still don't have a year
+            if year is None:
+                year = datetime.now().year
+                print(f"Using current year as fallback: {year}")
+            
+            # Handle different date formats
+            
+            # For MM/DD format (e.g., "12/27")
             if isinstance(df['date'].iloc[0], str) and len(df['date'].iloc[0].split('/')) == 2:
-                # Add current year to make it parseable
-                df['date'] = df['date'].apply(lambda x: f"{x}/{current_year}" if isinstance(x, str) and len(x.split('/')) == 2 else x)
+                print(f"Detected MM/DD format, adding year {year}")
+                # Add extracted year to make dates parseable
+                df['date'] = df['date'].apply(lambda x: f"{x}/{year}" if isinstance(x, str) and len(x.split('/')) == 2 else x)
                 df['date'] = pd.to_datetime(df['date'], errors='coerce')
-            else:
-                # For other formats, use coerce to convert unparseable dates to NaT
-                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            
+            # If we still have NaT values, try other common date formats
+            if df['date'].isna().any():
+                temp_dates = pd.Series(df['date'].copy())
+                formats_to_try = ['%m/%d/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m-%d-%Y', '%m/%d/%y', '%d/%m/%Y']
                 
+                for date_format in formats_to_try:
+                    # Try to parse with this format
+                    try:
+                        parsed = pd.to_datetime(temp_dates, format=date_format, errors='coerce')
+                        
+                        # If this format parsed any dates successfully, merge them in
+                        if not parsed.isna().all():
+                            print(f"Successfully parsed some dates with format: {date_format}")
+                            # For rows where current is NaT but parsed is not, use the parsed value
+                            mask = df['date'].isna() & ~parsed.isna()
+                            df.loc[mask, 'date'] = parsed[mask]
+                            
+                            # If all dates are now valid, stop trying formats
+                            if not df['date'].isna().any():
+                                break
+                    except Exception as e:
+                        # Format didn't work, try the next one
+                        continue
+            
+            # If we still have NaT values, try a last-resort approach for MM/DD format with extracted year
+            if df['date'].isna().any():
+                print("Attempting last-resort date parsing for remaining NaT values...")
+                
+                # Get only the rows with NaT dates
+                mask = df['date'].isna()
+                nat_dates = df.loc[mask, 'date'].copy()
+                
+                # Try to convert each string to a date with the known year
+                fixed_dates = []
+                for date_str in nat_dates:
+                    try:
+                        if isinstance(date_str, str):
+                            parts = date_str.strip().split('/')
+                            if len(parts) == 2:
+                                # Assume MM/DD format, add the year
+                                month, day = parts
+                                new_date_str = f"{month.zfill(2)}/{day.zfill(2)}/{year}"
+                                fixed_dates.append(pd.to_datetime(new_date_str))
+                            else:
+                                fixed_dates.append(pd.NaT)
+                        else:
+                            fixed_dates.append(pd.NaT)
+                    except:
+                        fixed_dates.append(pd.NaT)
+                
+                # Update only the formerly NaT values that we could fix
+                if fixed_dates:
+                    fixed_series = pd.Series(fixed_dates, index=nat_dates.index)
+                    valid_mask = ~fixed_series.isna()
+                    if valid_mask.any():
+                        print(f"Fixed {valid_mask.sum()} additional dates with manual parsing")
+                        df.loc[fixed_series.index[valid_mask], 'date'] = fixed_series[valid_mask]
+            
             # Drop rows with invalid dates
+            original_count = len(df)
             df = df.dropna(subset=['date'])
+            if len(df) < original_count:
+                print(f"Dropped {original_count - len(df)} rows with invalid dates")
+                
+            print(f"Successfully parsed {len(df)} dates")
         
         # Ensure amount is consistently signed (expenses negative, income positive)
         if source in ['chase', 'wells_fargo']:
