@@ -36,7 +36,8 @@ def main():
     if not transactions.empty:
         # Calculate financial metrics
         total_income = transactions[transactions['amount'] > 0]['amount'].sum()
-        total_expenses = transactions[transactions['amount'] < 0]['amount'].sum().abs()
+        # Fix for numpy float64 objects not having abs() method
+        total_expenses = abs(transactions[transactions['amount'] < 0]['amount'].sum())
         net_worth = total_income - total_expenses
         
         # Get bank account transactions (deposits/withdrawals) - approximating as non-credit card transactions
@@ -45,7 +46,7 @@ def main():
         
         # Credit card related transactions - approximating based on descriptions
         credit_transactions = transactions[transactions['description'].str.contains('card|credit|payment', case=False, na=False)]
-        credit_card_due = credit_transactions[credit_transactions['amount'] < 0]['amount'].sum().abs()
+        credit_card_due = abs(credit_transactions[credit_transactions['amount'] < 0]['amount'].sum())
         
         # Calculate monthly change
         # Get current and previous month data
@@ -64,11 +65,11 @@ def main():
             monthly_change_str = f"{monthly_change_pct:.1f}%"
             
             # Determine if it's an increase or decrease for the delta color
+            # Streamlit only accepts 'normal', 'inverse', or 'off' for delta_color
             delta_color = "normal"
-            if monthly_change_pct > 0:
-                delta_color = "up" if current_month_net > 0 else "down"
-            elif monthly_change_pct < 0:
-                delta_color = "down" if current_month_net > 0 else "up"
+            # We'll use 'normal' for positive changes and 'inverse' for negative
+            if monthly_change_pct < 0:
+                delta_color = "inverse"
         else:
             monthly_change_str = "N/A"
             delta_color = "normal"
@@ -124,13 +125,13 @@ def main():
         if not transactions.empty:
             # Calculate more detailed metrics
             total_income = transactions[transactions['amount'] > 0]['amount'].sum()
-            total_expenses = transactions[transactions['amount'] < 0]['amount'].sum().abs()
+            total_expenses = abs(transactions[transactions['amount'] < 0]['amount'].sum())
             balance = total_income - total_expenses
             
             # Current month stats
             current_month = pd.Timestamp.now().strftime('%Y-%m')
             current_month_mask = transactions['date'].dt.strftime('%Y-%m') == current_month
-            current_month_expenses = transactions[current_month_mask & (transactions['amount'] < 0)]['amount'].sum().abs()
+            current_month_expenses = abs(transactions[current_month_mask & (transactions['amount'] < 0)]['amount'].sum())
             current_month_income = transactions[current_month_mask & (transactions['amount'] > 0)]['amount'].sum()
             
             metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
