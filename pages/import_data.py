@@ -38,11 +38,11 @@ def main():
     - Apple Pay
     - Schwab
     
-    **Supported format:** CSV files only
+    **Supported formats:** Excel (XLSX) files
     """)
     
-    # File upload - CSV only
-    uploaded_file = st.file_uploader("Upload statement file", type=["csv"])
+    # File upload - Excel only
+    uploaded_file = st.file_uploader("Upload statement file", type=["xlsx", "xls"])
     
     # Initialize temp_file_path outside of try/except blocks to avoid unbound variable issues
     temp_file_path = None
@@ -57,15 +57,15 @@ def main():
             with open(temp_file_path, "wb") as temp_file:
                 temp_file.write(uploaded_file.getvalue())
             
-            # Verify it's a CSV file
+            # Verify it's an Excel file
             file_type = detect_file_type(temp_file_path)
             
-            if file_type != 'csv':
-                st.error("Unsupported file format. Please upload a CSV file.")
+            if file_type not in ['xlsx', 'xls']:
+                st.error("Unsupported file format. Please upload an Excel (XLSX/XLS) file.")
                 return
                 
             # Show file type information
-            st.info("CSV file detected. The system will extract transactions from the CSV data.")
+            st.info("Excel file detected. The system will extract transactions from the Excel data.")
             
             # Try to detect source from content
             detected_source = detect_source_from_header(temp_file_path)
@@ -78,16 +78,26 @@ def main():
                 index=source_options.index(detected_source) if detected_source in source_options else 0
             )
             
-            # Show preview of the file
-            st.subheader("File Preview")
-            with st.spinner("Generating preview..."):
-                preview = read_file_to_preview(temp_file_path)
-                st.dataframe(preview)
-                
-            # Always set confirm_import to True for CSV files
+            # Always set confirm_import to True for Excel files
             confirm_import = True
             
-            # No need for page_numbers with CSV files
+            # Add support for selecting Excel sheets
+            sheet_name = None
+            if file_type in ['xlsx', 'xls']:
+                import pandas as pd
+                # Get list of sheet names
+                all_sheets = pd.ExcelFile(temp_file_path).sheet_names
+                if len(all_sheets) > 1:
+                    sheet_name = st.selectbox("Select sheet with transaction data:", all_sheets)
+                else:
+                    # Use the first sheet if there's only one
+                    sheet_name = all_sheets[0] if all_sheets else None
+            
+            # Show preview of the file with selected sheet
+            st.subheader("File Preview")
+            with st.spinner("Generating preview..."):
+                preview = read_file_to_preview(temp_file_path, sheet_name=sheet_name)
+                st.dataframe(preview)
             page_numbers = None
             
             # Import button
@@ -95,7 +105,7 @@ def main():
                 with st.spinner("Importing and processing data..."):
                     try:
                         # Import, categorize, and save to database
-                        df = import_statement(temp_file_path, selected_source, page_numbers=page_numbers)
+                        df = import_statement(temp_file_path, selected_source, sheet_name=sheet_name)
                         
                         if df.empty:
                             st.error("No transactions were found in the file. Please check the file format and try again.")

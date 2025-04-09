@@ -4,61 +4,109 @@ import os
 from datetime import datetime
 import re
 
-def import_statement(filepath, source, page_numbers=None):
+def import_statement(filepath, source, sheet_name=None):
     """
     Import a statement from any source and standardize the format
     
     Parameters:
         filepath (str): Path to the statement file
         source (str): One of 'wells_fargo', 'chase', 'bank_of_america', 'apple_pay', 'schwab'
-        page_numbers (list, optional): This parameter is kept for backward compatibility but is not used
+        sheet_name (str, optional): Name of the Excel sheet to import. If None, uses the first sheet.
     
     Returns:
         pandas.DataFrame: Standardized dataframe with transactions
     """
     try:
-        # Handle CSV files based on source
-        if source == 'wells_fargo':
-            df = pd.read_csv(filepath)
-            # Wells Fargo specific column mapping
-            df = df.rename(columns={
-                'Date': 'date',
-                'Description': 'description',
-                'Amount': 'amount'
-            })
-        elif source == 'chase':
-            # Chase specific format
-            df = pd.read_csv(filepath)
-            df = df.rename(columns={
-                'Transaction Date': 'date',
-                'Post Date': 'post_date',
-                'Description': 'description',
-                'Amount': 'amount',
-                'Category': 'original_category'
-            })
-        elif source == 'bank_of_america':
-            df = pd.read_csv(filepath)
-            df = df.rename(columns={
-                'Posted Date': 'date',
-                'Payee': 'description',
-                'Amount': 'amount'
-            })
-        elif source == 'apple_pay':
-            df = pd.read_csv(filepath)
-            df = df.rename(columns={
-                'Date': 'date',
-                'Description': 'description',
-                'Amount (USD)': 'amount'
-            })
-        elif source == 'schwab':
-            df = pd.read_csv(filepath)
-            df = df.rename(columns={
-                'Date': 'date',
-                'Description': 'description',
-                'Amount': 'amount'
-            })
+        # Check file type
+        file_type = detect_file_type(filepath)
+        
+        # Import data based on file type and source
+        if file_type in ['xlsx', 'xls']:
+            # Excel file import
+            if source == 'wells_fargo':
+                df = pd.read_excel(filepath, sheet_name=sheet_name)
+                # Wells Fargo specific column mapping
+                df = df.rename(columns={
+                    'Date': 'date',
+                    'Description': 'description',
+                    'Amount': 'amount'
+                })
+            elif source == 'chase':
+                # Chase specific format
+                df = pd.read_excel(filepath, sheet_name=sheet_name)
+                df = df.rename(columns={
+                    'Transaction Date': 'date',
+                    'Post Date': 'post_date',
+                    'Description': 'description',
+                    'Amount': 'amount',
+                    'Category': 'original_category'
+                })
+            elif source == 'bank_of_america':
+                df = pd.read_excel(filepath, sheet_name=sheet_name)
+                df = df.rename(columns={
+                    'Posted Date': 'date',
+                    'Payee': 'description',
+                    'Amount': 'amount'
+                })
+            elif source == 'apple_pay':
+                df = pd.read_excel(filepath, sheet_name=sheet_name)
+                df = df.rename(columns={
+                    'Date': 'date',
+                    'Description': 'description',
+                    'Amount (USD)': 'amount'
+                })
+            elif source == 'schwab':
+                df = pd.read_excel(filepath, sheet_name=sheet_name)
+                df = df.rename(columns={
+                    'Date': 'date',
+                    'Description': 'description',
+                    'Amount': 'amount'
+                })
+            else:
+                raise ValueError(f"Unsupported source: {source}")
+        elif file_type == 'csv':
+            # Legacy CSV support
+            if source == 'wells_fargo':
+                df = pd.read_csv(filepath)
+                df = df.rename(columns={
+                    'Date': 'date',
+                    'Description': 'description',
+                    'Amount': 'amount'
+                })
+            elif source == 'chase':
+                df = pd.read_csv(filepath)
+                df = df.rename(columns={
+                    'Transaction Date': 'date',
+                    'Post Date': 'post_date',
+                    'Description': 'description',
+                    'Amount': 'amount',
+                    'Category': 'original_category'
+                })
+            elif source == 'bank_of_america':
+                df = pd.read_csv(filepath)
+                df = df.rename(columns={
+                    'Posted Date': 'date',
+                    'Payee': 'description',
+                    'Amount': 'amount'
+                })
+            elif source == 'apple_pay':
+                df = pd.read_csv(filepath)
+                df = df.rename(columns={
+                    'Date': 'date',
+                    'Description': 'description',
+                    'Amount (USD)': 'amount'
+                })
+            elif source == 'schwab':
+                df = pd.read_csv(filepath)
+                df = df.rename(columns={
+                    'Date': 'date',
+                    'Description': 'description',
+                    'Amount': 'amount'
+                })
+            else:
+                raise ValueError(f"Unsupported source: {source}")
         else:
-            raise ValueError(f"Unsupported source: {source}")
+            raise ValueError(f"Unsupported file format: {file_type}. Please use Excel or CSV.")
         
         # Standardize date format with error handling for incomplete dates
         try:
@@ -215,17 +263,39 @@ def import_statement(filepath, source, page_numbers=None):
 
 def detect_source_from_header(filepath):
     """
-    Try to automatically detect the source bank from CSV header
+    Try to automatically detect the source bank from file header
     
     Parameters:
-        filepath (str): Path to the CSV file
+        filepath (str): Path to the file (Excel or CSV)
     
     Returns:
         str: Detected source or None if not detected
     """
     try:
-        # For CSV files, check the header
-        header = pd.read_csv(filepath, nrows=0).columns.tolist()
+        # Check file type first
+        file_type = detect_file_type(filepath)
+        header = []
+        
+        # Extract headers based on file type
+        if file_type in ['xlsx', 'xls']:
+            # For Excel files
+            try:
+                df = pd.read_excel(filepath, nrows=0)
+                header = df.columns.tolist()
+            except Exception as e:
+                print(f"Error reading Excel header: {str(e)}")
+                return None
+        elif file_type == 'csv':
+            # For CSV files
+            try:
+                header = pd.read_csv(filepath, nrows=0).columns.tolist()
+            except Exception as e:
+                print(f"Error reading CSV header: {str(e)}")
+                return None
+        else:
+            return None
+        
+        # Convert header to string and check for institution markers
         header_str = ' '.join(header).lower()
         
         if 'wells' in header_str or ('date' in header_str and 'description' in header_str and 'wells fargo' in header_str):
@@ -246,36 +316,51 @@ def detect_source_from_header(filepath):
 
 def detect_file_type(filepath):
     """
-    Detect if file is CSV or PDF
+    Detect file type based on extension
     
     Parameters:
         filepath (str): Path to the file
     
     Returns:
-        str: 'csv', 'pdf', or 'unknown'
+        str: 'xlsx', 'xls', 'csv', 'pdf', or 'unknown'
     """
     _, ext = os.path.splitext(filepath)
-    if ext.lower() == '.csv':
+    ext = ext.lower()
+    
+    if ext == '.xlsx':
+        return 'xlsx'
+    elif ext == '.xls':
+        return 'xls'
+    elif ext == '.csv':
         return 'csv'
-    elif ext.lower() == '.pdf':
+    elif ext == '.pdf':
         return 'pdf'
     else:
         return 'unknown'
 
-def read_file_to_preview(filepath, num_rows=5):
+def read_file_to_preview(filepath, num_rows=5, sheet_name=None):
     """
-    Read a CSV file and return a preview for displaying to the user
+    Read a file (Excel or CSV) and return a preview for displaying to the user
     
     Parameters:
         filepath (str): Path to the file
         num_rows (int): Number of rows to preview
+        sheet_name (str, optional): For Excel files, which sheet to preview
     
     Returns:
         pandas.DataFrame: Preview of the file content
     """
     try:
-        # For CSV files
-        return pd.read_csv(filepath, nrows=num_rows)
+        file_type = detect_file_type(filepath)
+        
+        if file_type in ['xlsx', 'xls']:
+            # For Excel files
+            return pd.read_excel(filepath, sheet_name=sheet_name, nrows=num_rows)
+        elif file_type == 'csv':
+            # For CSV files
+            return pd.read_csv(filepath, nrows=num_rows)
+        else:
+            return pd.DataFrame({'Error': [f"Unsupported file format: {file_type}"]})
     except Exception as e:
         # If we encounter an error, return an empty DataFrame with an error message
         print(f"Error generating preview: {str(e)}")
