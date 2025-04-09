@@ -60,8 +60,25 @@ def import_statement(filepath, source, page_numbers=None):
         else:
             raise ValueError(f"Unsupported source: {source}")
         
-        # Standardize date format
-        df['date'] = pd.to_datetime(df['date'])
+        # Standardize date format with error handling for incomplete dates
+        try:
+            # First attempt - try standard conversion
+            df['date'] = pd.to_datetime(df['date'])
+        except (ValueError, TypeError, pd.errors.OutOfBoundsDatetime):
+            # Handle special cases like MM/DD without year
+            current_year = datetime.now().year
+            
+            # Check if we have dates in MM/DD format without year
+            if isinstance(df['date'].iloc[0], str) and len(df['date'].iloc[0].split('/')) == 2:
+                # Add current year to make it parseable
+                df['date'] = df['date'].apply(lambda x: f"{x}/{current_year}" if isinstance(x, str) and len(x.split('/')) == 2 else x)
+                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            else:
+                # For other formats, use coerce to convert unparseable dates to NaT
+                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                
+            # Drop rows with invalid dates
+            df = df.dropna(subset=['date'])
         
         # Ensure amount is consistently signed (expenses negative, income positive)
         if source in ['chase', 'wells_fargo']:
