@@ -184,13 +184,14 @@ def load_from_database(db_path='finance_data.db', start_date=None, end_date=None
         print(f"Error loading from database: {str(e)}")
         return pd.DataFrame()
 
-def delete_transaction(transaction_id, db_path='finance_data.db'):
+def delete_transaction(transaction_id, db_path='finance_data.db', reindex=True):
     """
-    Delete a transaction from the database
+    Delete a transaction from the database and optionally reindex remaining transactions
     
     Parameters:
         transaction_id (int): ID of the transaction to delete
         db_path (str): Path to the SQLite database
+        reindex (bool): If True, renumber all transaction IDs to ensure sequential order
     
     Returns:
         bool: True if successful, False otherwise
@@ -202,14 +203,56 @@ def delete_transaction(transaction_id, db_path='finance_data.db'):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
+        # Begin transaction
+        cursor.execute("BEGIN TRANSACTION")
+        
+        # Delete the transaction
         cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
         
-        conn.commit()
+        # Reindex remaining transactions if requested
+        if reindex:
+            # Get all transactions in order
+            cursor.execute("SELECT id FROM transactions ORDER BY id")
+            rows = cursor.fetchall()
+            
+            # Create a temporary table to store transactions
+            cursor.execute("""
+                CREATE TEMPORARY TABLE temp_transactions AS 
+                SELECT * FROM transactions ORDER BY id
+            """)
+            
+            # Delete all from main table
+            cursor.execute("DELETE FROM transactions")
+            
+            # Reset the auto-increment counter
+            cursor.execute("DELETE FROM sqlite_sequence WHERE name='transactions'")
+            
+            # Copy back from temp table - SQLite will assign new sequential IDs
+            cursor.execute("""
+                INSERT INTO transactions (date, description, amount, source, category, original_category)
+                SELECT date, description, amount, source, category, original_category 
+                FROM temp_transactions
+                ORDER BY id
+            """)
+            
+            # Drop temporary table
+            cursor.execute("DROP TABLE temp_transactions")
+        
+        # Commit all changes
+        cursor.execute("COMMIT")
         conn.close()
         
         return True
     except Exception as e:
         print(f"Error deleting transaction: {str(e)}")
+        # If an error occurs, try to rollback
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.execute("ROLLBACK")
+            if 'conn' in locals() and conn:
+                conn.close()
+        except:
+            pass
         return False
 
 def update_transaction(transaction_id, field, value, db_path='finance_data.db'):
@@ -405,13 +448,14 @@ def get_categories(db_path='finance_data.db'):
         print(f"Error getting categories: {str(e)}")
         return pd.DataFrame()
 
-def delete_transactions_by_source(source, db_path='finance_data.db'):
+def delete_transactions_by_source(source, db_path='finance_data.db', reindex=True):
     """
-    Delete all transactions from a specific source
+    Delete all transactions from a specific source and optionally reindex remaining transactions
     
     Parameters:
         source (str): Source of transactions to delete (e.g., 'wells_fargo')
         db_path (str): Path to the SQLite database
+        reindex (bool): If True, renumber all transaction IDs to ensure sequential order
     
     Returns:
         int: Number of transactions deleted, -1 if error
@@ -423,6 +467,9 @@ def delete_transactions_by_source(source, db_path='finance_data.db'):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
+        # Begin transaction
+        cursor.execute("BEGIN TRANSACTION")
+        
         # Get count of transactions to be deleted
         cursor.execute("SELECT COUNT(*) FROM transactions WHERE source = ?", (source,))
         count = cursor.fetchone()[0]
@@ -430,10 +477,44 @@ def delete_transactions_by_source(source, db_path='finance_data.db'):
         # Delete the transactions
         cursor.execute("DELETE FROM transactions WHERE source = ?", (source,))
         
-        conn.commit()
+        # Reindex remaining transactions if requested
+        if reindex:
+            # Create a temporary table to store transactions
+            cursor.execute("""
+                CREATE TEMPORARY TABLE temp_transactions AS 
+                SELECT * FROM transactions ORDER BY id
+            """)
+            
+            # Delete all from main table
+            cursor.execute("DELETE FROM transactions")
+            
+            # Reset the auto-increment counter
+            cursor.execute("DELETE FROM sqlite_sequence WHERE name='transactions'")
+            
+            # Copy back from temp table - SQLite will assign new sequential IDs
+            cursor.execute("""
+                INSERT INTO transactions (date, description, amount, source, category, original_category)
+                SELECT date, description, amount, source, category, original_category 
+                FROM temp_transactions
+                ORDER BY id
+            """)
+            
+            # Drop temporary table
+            cursor.execute("DROP TABLE temp_transactions")
+        
+        # Commit all changes
+        cursor.execute("COMMIT")
         conn.close()
         
         return count
     except Exception as e:
         print(f"Error deleting transactions by source: {str(e)}")
+        # If an error occurs, try to rollback
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.execute("ROLLBACK")
+            if 'conn' in locals() and conn:
+                conn.close()
+        except:
+            pass
         return -1
