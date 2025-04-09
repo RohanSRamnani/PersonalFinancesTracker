@@ -199,7 +199,7 @@ def main():
                 if st.button("Delete Transaction", key="delete_button"):
                     if delete_transaction(delete_id, st.session_state.db_path):
                         st.success(f"Transaction {delete_id} deleted successfully")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Error deleting transaction")
             else:
