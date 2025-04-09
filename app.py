@@ -23,16 +23,88 @@ def main():
         initialize_database(st.session_state.db_path)
     
     # Title and description
-    st.title("Personal Finance Tracker")
+    st.title("Personal Finance Dashboard")
     st.markdown("""
-    Analyze your spending habits, create budgets, and visualize your financial journey all in one place.
+    Your complete financial picture in one place. Track spending, budget, and measure progress over time.
     """)
     
     # Load transactions from database
     transactions = load_from_database(st.session_state.db_path)
     st.session_state.transactions = transactions
     
-    # Display summary dashboard
+    # Display key financial metrics at the top
+    if not transactions.empty:
+        # Calculate financial metrics
+        total_income = transactions[transactions['amount'] > 0]['amount'].sum()
+        total_expenses = transactions[transactions['amount'] < 0]['amount'].sum().abs()
+        net_worth = total_income - total_expenses
+        
+        # Get bank account transactions (deposits/withdrawals) - approximating as non-credit card transactions
+        bank_transactions = transactions[~transactions['description'].str.contains('card|credit|payment', case=False, na=False)]
+        bank_balance = bank_transactions['amount'].sum()
+        
+        # Credit card related transactions - approximating based on descriptions
+        credit_transactions = transactions[transactions['description'].str.contains('card|credit|payment', case=False, na=False)]
+        credit_card_due = credit_transactions[credit_transactions['amount'] < 0]['amount'].sum().abs()
+        
+        # Calculate monthly change
+        # Get current and previous month data
+        current_month = pd.Timestamp.now().strftime('%Y-%m')
+        current_month_mask = transactions['date'].dt.strftime('%Y-%m') == current_month
+        current_month_net = transactions[current_month_mask]['amount'].sum()
+        
+        # Get previous month - approximating as 1 month before current
+        prev_month = (pd.Timestamp.now() - pd.DateOffset(months=1)).strftime('%Y-%m')
+        prev_month_mask = transactions['date'].dt.strftime('%Y-%m') == prev_month
+        prev_month_net = transactions[prev_month_mask]['amount'].sum()
+        
+        # Calculate percent change if previous month had transactions
+        if prev_month_net != 0:
+            monthly_change_pct = ((current_month_net - prev_month_net) / abs(prev_month_net)) * 100
+            monthly_change_str = f"{monthly_change_pct:.1f}%"
+            
+            # Determine if it's an increase or decrease for the delta color
+            delta_color = "normal"
+            if monthly_change_pct > 0:
+                delta_color = "up" if current_month_net > 0 else "down"
+            elif monthly_change_pct < 0:
+                delta_color = "down" if current_month_net > 0 else "up"
+        else:
+            monthly_change_str = "N/A"
+            delta_color = "normal"
+        
+        # Create a dashboard with key metrics
+        st.subheader("Key Financial Metrics")
+        
+        # Top row for primary metrics
+        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+        
+        metric_col1.metric(
+            "Net Worth", 
+            f"${net_worth:,.2f}",
+            monthly_change_str,
+            delta_color=delta_color
+        )
+        
+        metric_col2.metric(
+            "Bank Account Balance",
+            f"${bank_balance:,.2f}"
+        )
+        
+        metric_col3.metric(
+            "Credit Card Payment Due",
+            f"${credit_card_due:,.2f}"
+        )
+        
+        metric_col4.metric(
+            "Monthly Change",
+            monthly_change_str,
+            delta_color=delta_color
+        )
+    else:
+        st.info("Import your financial data to see your financial metrics and insights.")
+        
+    # Recent transactions and financial overview in two columns
     col1, col2 = st.columns(2)
     
     with col1:
@@ -50,7 +122,7 @@ def main():
     with col2:
         st.subheader("Financial Overview")
         if not transactions.empty:
-            # Calculate key financial metrics
+            # Calculate more detailed metrics
             total_income = transactions[transactions['amount'] > 0]['amount'].sum()
             total_expenses = transactions[transactions['amount'] < 0]['amount'].sum().abs()
             balance = total_income - total_expenses
@@ -59,6 +131,7 @@ def main():
             current_month = pd.Timestamp.now().strftime('%Y-%m')
             current_month_mask = transactions['date'].dt.strftime('%Y-%m') == current_month
             current_month_expenses = transactions[current_month_mask & (transactions['amount'] < 0)]['amount'].sum().abs()
+            current_month_income = transactions[current_month_mask & (transactions['amount'] > 0)]['amount'].sum()
             
             metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
             
@@ -66,7 +139,10 @@ def main():
             metrics_col2.metric("Total Expenses", f"${total_expenses:,.2f}")
             metrics_col3.metric("Balance", f"${balance:,.2f}")
             
-            st.metric("Current Month Expenses", f"${current_month_expenses:,.2f}")
+            # Monthly metrics
+            month_col1, month_col2 = st.columns(2)
+            month_col1.metric("Current Month Income", f"${current_month_income:,.2f}")
+            month_col2.metric("Current Month Expenses", f"${current_month_expenses:,.2f}")
         else:
             st.info("Import your financial data to see an overview of your finances.")
     

@@ -38,11 +38,11 @@ def main():
     - Apple Pay
     - Schwab
     
-    **Supported formats:** CSV and PDF files
+    **Supported format:** CSV files only
     """)
     
-    # File upload
-    uploaded_file = st.file_uploader("Upload statement file", type=["csv", "pdf"])
+    # File upload - CSV only
+    uploaded_file = st.file_uploader("Upload statement file", type=["csv"])
     
     # Initialize temp_file_path outside of try/except blocks to avoid unbound variable issues
     temp_file_path = None
@@ -57,20 +57,17 @@ def main():
             with open(temp_file_path, "wb") as temp_file:
                 temp_file.write(uploaded_file.getvalue())
             
-            # Detect file type
+            # Verify it's a CSV file
             file_type = detect_file_type(temp_file_path)
             
-            if file_type == 'unknown':
-                st.error("Unsupported file format. Please upload a CSV or PDF file.")
+            if file_type != 'csv':
+                st.error("Unsupported file format. Please upload a CSV file.")
                 return
                 
             # Show file type information
-            if file_type == 'csv':
-                st.info("CSV file detected. The system will extract transactions from the CSV data.")
-            elif file_type == 'pdf':
-                st.info("PDF file detected. The system will attempt to extract tables and transaction data from the PDF.")
+            st.info("CSV file detected. The system will extract transactions from the CSV data.")
             
-            # Try to detect source from file content
+            # Try to detect source from content
             detected_source = detect_source_from_header(temp_file_path)
             
             # Source selection
@@ -87,51 +84,11 @@ def main():
                 preview = read_file_to_preview(temp_file_path)
                 st.dataframe(preview)
                 
-            # Add additional notes for PDF files
-            if file_type == 'pdf':
-                st.markdown("""
-                **Note about PDF imports:** 
-                - The system will attempt to automatically extract transaction tables from the PDF
-                - The quality of extraction depends on the PDF's structure
-                - For best results, use CSV files when available
-                """)
-                
-            # Add option to confirm PDF parsing looks correct
-            if file_type == 'pdf':
-                st.warning("Please review the preview above. If it doesn't look like transaction data, try a different file format.")
-                confirm_import = st.checkbox("The preview looks good, continue with import", value=True)
-            else:
-                confirm_import = True
+            # Always set confirm_import to True for CSV files
+            confirm_import = True
             
-            # Add page selection for PDF files
+            # No need for page_numbers with CSV files
             page_numbers = None
-            if file_type == 'pdf':
-                st.subheader("PDF Options")
-                page_option = st.radio(
-                    "Select pages to extract transactions from:",
-                    ["All Pages", "Specific Pages"],
-                    index=0
-                )
-                
-                if page_option == "Specific Pages":
-                    page_input = st.text_input(
-                        "Enter page numbers (comma-separated, e.g., 1,3,5 or range like 2-4):",
-                        value="3"  # Default to page 3 since that's often where transaction data is
-                    )
-                    
-                    if page_input:
-                        # Parse the page input (handles both comma-separated values and ranges)
-                        try:
-                            page_numbers = []
-                            for part in page_input.split(','):
-                                if '-' in part:
-                                    start, end = map(int, part.split('-'))
-                                    page_numbers.extend(range(start, end + 1))
-                                else:
-                                    page_numbers.append(int(part))
-                        except ValueError:
-                            st.warning("Invalid page format. Using default (all pages).")
-                            page_numbers = None
             
             # Import button
             if st.button("Import Data") and confirm_import:
@@ -169,10 +126,8 @@ def main():
                                 st.error("Error saving data to database")
                     except Exception as e:
                         st.error(f"Error during import: {str(e)}")
-                        if file_type == 'pdf':
-                            st.error("PDF extraction failed. The PDF format may not be compatible with our extraction tools. Try exporting to CSV instead.")
             elif st.button("Import Data") and not confirm_import:
-                st.warning("Please confirm that the preview looks good by checking the box above.")
+                st.warning("Please confirm before importing.")
             
             # Clean up temporary file
             if temp_file_path and os.path.exists(temp_file_path):
