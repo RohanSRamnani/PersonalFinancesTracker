@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.database import load_from_database, delete_transaction, update_transaction
+from utils.database import load_from_database, delete_transaction, update_transaction, delete_transactions_by_source
 from utils.categorization import get_category_list
 import datetime
 
@@ -173,7 +173,7 @@ def main():
                         update_transaction(edit_id, 'date', edit_date.strftime('%Y-%m-%d'), st.session_state.db_path)
                     
                     st.success(f"Transaction {edit_id} updated successfully")
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 st.error(f"No transaction found with ID {edit_id}")
     
@@ -204,6 +204,37 @@ def main():
                         st.error("Error deleting transaction")
             else:
                 st.error(f"No transaction found with ID {delete_id}")
+        
+        # Add a section for bulk deletion by source
+        st.markdown("---")
+        st.subheader("Bulk Delete by Source")
+        
+        # Get unique sources for the dropdown
+        all_sources = sorted(transactions['source'].unique().tolist())
+        
+        if all_sources:
+            bulk_delete_source = st.selectbox(
+                "Select Source to Delete All Transactions From", 
+                all_sources,
+                key="bulk_delete_source"
+            )
+            
+            # Show information about how many transactions will be deleted
+            source_count = len(transactions[transactions['source'] == bulk_delete_source])
+            st.warning(f"This will delete ALL {source_count} transactions from '{bulk_delete_source}'.")
+            
+            # Require confirmation
+            confirm_delete = st.checkbox("I understand this action cannot be undone")
+            
+            if st.button("Delete All Transactions from Source", key="bulk_delete_button") and confirm_delete:
+                count = delete_transactions_by_source(bulk_delete_source, st.session_state.db_path)
+                if count > 0:
+                    st.success(f"Successfully deleted {count} transactions from {bulk_delete_source}")
+                    st.rerun()
+                else:
+                    st.error(f"Error deleting transactions from {bulk_delete_source}")
+            elif st.button("Delete All Transactions from Source", key="bulk_delete_button_no_confirm") and not confirm_delete:
+                st.error("Please confirm the deletion by checking the box above")
 
 if __name__ == "__main__":
     main()

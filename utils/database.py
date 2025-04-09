@@ -404,3 +404,36 @@ def get_categories(db_path='finance_data.db'):
     except Exception as e:
         print(f"Error getting categories: {str(e)}")
         return pd.DataFrame()
+
+def delete_transactions_by_source(source, db_path='finance_data.db'):
+    """
+    Delete all transactions from a specific source
+    
+    Parameters:
+        source (str): Source of transactions to delete (e.g., 'wells_fargo')
+        db_path (str): Path to the SQLite database
+    
+    Returns:
+        int: Number of transactions deleted, -1 if error
+    """
+    if not check_db_exists(db_path):
+        return -1
+        
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get count of transactions to be deleted
+        cursor.execute("SELECT COUNT(*) FROM transactions WHERE source = ?", (source,))
+        count = cursor.fetchone()[0]
+        
+        # Delete the transactions
+        cursor.execute("DELETE FROM transactions WHERE source = ?", (source,))
+        
+        conn.commit()
+        conn.close()
+        
+        return count
+    except Exception as e:
+        print(f"Error deleting transactions by source: {str(e)}")
+        return -1
