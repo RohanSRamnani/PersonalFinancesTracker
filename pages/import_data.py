@@ -83,21 +83,36 @@ def main():
             
             # Add support for selecting Excel sheets
             sheet_name = None
+            file_type = detect_file_type(temp_file_path)
+            
             if file_type in ['xlsx', 'xls']:
                 import pandas as pd
-                # Get list of sheet names
-                all_sheets = pd.ExcelFile(temp_file_path).sheet_names
-                if len(all_sheets) > 1:
-                    sheet_name = st.selectbox("Select sheet with transaction data:", all_sheets)
-                else:
-                    # Use the first sheet if there's only one
-                    sheet_name = all_sheets[0] if all_sheets else None
-            
-            # Show preview of the file with selected sheet
-            st.subheader("File Preview")
-            with st.spinner("Generating preview..."):
-                preview = read_file_to_preview(temp_file_path, sheet_name=sheet_name)
-                st.dataframe(preview)
+                try:
+                    # Get list of sheet names
+                    excel_file = pd.ExcelFile(temp_file_path)
+                    all_sheets = excel_file.sheet_names
+                    
+                    if len(all_sheets) > 1:
+                        sheet_name = st.selectbox("Select sheet with transaction data:", all_sheets)
+                    else:
+                        # Use the first sheet if there's only one
+                        sheet_name = all_sheets[0] if all_sheets else None
+                        
+                    # Show preview of the file with selected sheet
+                    st.subheader("File Preview")
+                    with st.spinner("Generating preview..."):
+                        preview = read_file_to_preview(temp_file_path, sheet_name=sheet_name)
+                        st.dataframe(preview)
+                except Exception as e:
+                    st.error(f"Error reading Excel file: {str(e)}")
+            else:
+                # For CSV files, just show the preview
+                st.subheader("File Preview")
+                with st.spinner("Generating preview..."):
+                    preview = read_file_to_preview(temp_file_path)
+                    st.dataframe(preview)
+                    
+            # Keep this for backward compatibility
             page_numbers = None
             
             # Import button

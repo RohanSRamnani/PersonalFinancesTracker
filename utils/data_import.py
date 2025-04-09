@@ -22,48 +22,104 @@ def import_statement(filepath, source, sheet_name=None):
         
         # Import data based on file type and source
         if file_type in ['xlsx', 'xls']:
-            # Excel file import
-            if source == 'wells_fargo':
-                df = pd.read_excel(filepath, sheet_name=sheet_name)
-                # Wells Fargo specific column mapping
-                df = df.rename(columns={
-                    'Date': 'date',
-                    'Description': 'description',
-                    'Amount': 'amount'
-                })
-            elif source == 'chase':
-                # Chase specific format
-                df = pd.read_excel(filepath, sheet_name=sheet_name)
-                df = df.rename(columns={
-                    'Transaction Date': 'date',
-                    'Post Date': 'post_date',
-                    'Description': 'description',
-                    'Amount': 'amount',
-                    'Category': 'original_category'
-                })
-            elif source == 'bank_of_america':
-                df = pd.read_excel(filepath, sheet_name=sheet_name)
-                df = df.rename(columns={
-                    'Posted Date': 'date',
-                    'Payee': 'description',
-                    'Amount': 'amount'
-                })
-            elif source == 'apple_pay':
-                df = pd.read_excel(filepath, sheet_name=sheet_name)
-                df = df.rename(columns={
-                    'Date': 'date',
-                    'Description': 'description',
-                    'Amount (USD)': 'amount'
-                })
-            elif source == 'schwab':
-                df = pd.read_excel(filepath, sheet_name=sheet_name)
-                df = df.rename(columns={
-                    'Date': 'date',
-                    'Description': 'description',
-                    'Amount': 'amount'
-                })
-            else:
-                raise ValueError(f"Unsupported source: {source}")
+            # Excel file import - first load the data
+            df = pd.read_excel(filepath, sheet_name=sheet_name)
+            
+            # Print columns to help with debugging
+            print(f"Original Excel columns: {df.columns.tolist()}")
+            
+            # Make a copy of the columns with lowercase names for easier matching
+            lowercase_columns = {col.lower(): col for col in df.columns}
+            
+            # Define column mappings based on common patterns
+            date_columns = ['date', 'transaction date', 'posted date', 'trans date', 'transaction_date', 'time', 'day']
+            description_columns = ['description', 'payee', 'merchant', 'transaction', 'name', 'details', 'memo']
+            amount_columns = ['amount', 'transaction amount', 'debit', 'credit', 'payment', 'deposit', 'withdrawal', 'value']
+            
+            # Find which columns to use based on headers
+            date_col = None
+            desc_col = None
+            amount_col = None
+            
+            # Try to find matching columns based on the lowercase names
+            for col_pattern in date_columns:
+                for col in lowercase_columns:
+                    if col_pattern in col.lower():
+                        date_col = lowercase_columns[col]
+                        break
+                if date_col:
+                    break
+            
+            for col_pattern in description_columns:
+                for col in lowercase_columns:
+                    if col_pattern in col.lower():
+                        desc_col = lowercase_columns[col]
+                        break
+                if desc_col:
+                    break
+            
+            for col_pattern in amount_columns:
+                for col in lowercase_columns:
+                    if col_pattern in col.lower():
+                        amount_col = lowercase_columns[col]
+                        break
+                if amount_col:
+                    break
+            
+            # Add source-specific column matching logic as a fallback
+            if source == 'wells_fargo' and not (date_col and desc_col and amount_col):
+                # Try Wells Fargo specific column names
+                if 'Date' in df.columns:
+                    date_col = 'Date'
+                if 'Description' in df.columns:
+                    desc_col = 'Description'
+                if 'Amount' in df.columns:
+                    amount_col = 'Amount'
+            
+            elif source == 'chase' and not (date_col and desc_col and amount_col):
+                # Chase specific column names
+                if 'Transaction Date' in df.columns:
+                    date_col = 'Transaction Date'
+                if 'Description' in df.columns:
+                    desc_col = 'Description'
+                if 'Amount' in df.columns:
+                    amount_col = 'Amount'
+            
+            elif source == 'bank_of_america' and not (date_col and desc_col and amount_col):
+                # Bank of America specific column names
+                if 'Posted Date' in df.columns:
+                    date_col = 'Posted Date'
+                if 'Payee' in df.columns:
+                    desc_col = 'Payee'
+                if 'Amount' in df.columns:
+                    amount_col = 'Amount'
+            
+            # Check if required columns were found
+            if not date_col:
+                print("Date column not found in Excel file. Available columns:", df.columns.tolist())
+                raise ValueError("Could not find date column in Excel file")
+            
+            if not desc_col:
+                print("Description column not found in Excel file. Available columns:", df.columns.tolist())
+                raise ValueError("Could not find description column in Excel file")
+            
+            if not amount_col:
+                print("Amount column not found in Excel file. Available columns:", df.columns.tolist())
+                raise ValueError("Could not find amount column in Excel file")
+            
+            # Create a new DataFrame with the required columns
+            print(f"Using columns: date={date_col}, description={desc_col}, amount={amount_col}")
+            df = df.rename(columns={
+                date_col: 'date',
+                desc_col: 'description',
+                amount_col: 'amount'
+            })
+            
+            # Optional: if there's an original category column, try to capture it
+            for col in df.columns:
+                if 'category' in col.lower():
+                    df = df.rename(columns={col: 'original_category'})
+                    break
         elif file_type == 'csv':
             # Legacy CSV support
             if source == 'wells_fargo':
