@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from utils.database import load_from_database, check_db_exists, initialize_database
+from utils.account_balance import get_account_balances, update_account_balance, get_total_balance
 
 st.set_page_config(
     page_title="Personal Finance Tracker",
@@ -33,16 +34,28 @@ def main():
     st.session_state.transactions = transactions
     
     # Display key financial metrics at the top
+    # Get account balances
+    account_balances = get_account_balances(st.session_state.db_path)
+    
+    # Calculate financial metrics
     if not transactions.empty:
-        # Calculate financial metrics
         total_income = transactions[transactions['amount'] > 0]['amount'].sum()
         # Fix for numpy float64 objects not having abs() method
         total_expenses = abs(transactions[transactions['amount'] < 0]['amount'].sum())
         net_worth = total_income - total_expenses
         
-        # Get bank account transactions (deposits/withdrawals) - approximating as non-credit card transactions
-        bank_transactions = transactions[~transactions['description'].str.contains('card|credit|payment', case=False, na=False)]
-        bank_balance = bank_transactions['amount'].sum()
+        # Get the Wells Fargo balance from the account_balances table if it exists
+        wells_fargo_balance = 0
+        if not account_balances.empty:
+            wells_fargo_row = account_balances[account_balances['account_name'] == 'Wells Fargo']
+            if not wells_fargo_row.empty:
+                wells_fargo_balance = wells_fargo_row.iloc[0]['balance']
+            
+        # If Wells Fargo balance is 0, approximate from transactions
+        if wells_fargo_balance == 0:
+            # Get bank account transactions (deposits/withdrawals) - approximating as non-credit card transactions
+            bank_transactions = transactions[~transactions['description'].str.contains('card|credit|payment', case=False, na=False)]
+            wells_fargo_balance = bank_transactions['amount'].sum()
         
         # Credit card related transactions - approximating based on descriptions
         credit_transactions = transactions[transactions['description'].str.contains('card|credit|payment', case=False, na=False)]
@@ -87,10 +100,18 @@ def main():
             delta_color=delta_color
         )
         
-        metric_col2.metric(
-            "Bank Account Balance",
-            f"${bank_balance:,.2f}"
-        )
+        # Get total balance from all accounts if available, otherwise show Wells Fargo balance
+        if not account_balances.empty:
+            total_account_balance = account_balances['balance'].sum()
+            metric_col2.metric(
+                "Bank Account Balance",
+                f"${total_account_balance:,.2f}"
+            )
+        else:
+            metric_col2.metric(
+                "Wells Fargo Balance",
+                f"${wells_fargo_balance:,.2f}"
+            )
         
         metric_col3.metric(
             "Credit Card Payment Due",
@@ -102,6 +123,25 @@ def main():
             monthly_change_str,
             delta_color=delta_color
         )
+        
+        # Add a small section to edit Wells Fargo balance directly
+        with st.expander("Quick Balance Update"):
+            st.caption("Update your Wells Fargo balance without going to the Accounts page")
+            quick_balance_col1, quick_balance_col2 = st.columns([3, 1])
+            with quick_balance_col1:
+                new_wells_balance = st.number_input(
+                    "Wells Fargo Balance", 
+                    value=float(wells_fargo_balance), 
+                    step=10.0,
+                    format="%.2f"
+                )
+            with quick_balance_col2:
+                if st.button("Update"):
+                    if update_account_balance("Wells Fargo", new_wells_balance, st.session_state.db_path):
+                        st.success("Wells Fargo balance updated!")
+                        st.rerun()
+                    else:
+                        st.error("Failed to update balance")
     else:
         st.info("Import your financial data to see your financial metrics and insights.")
         

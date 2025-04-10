@@ -52,6 +52,16 @@ def initialize_database(db_path='finance_data.db'):
             )
         ''')
         
+        # Create account_balances table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS account_balances (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_name TEXT NOT NULL,
+                balance REAL NOT NULL,
+                last_updated TEXT NOT NULL
+            )
+        ''')
+        
         # Default categories
         default_categories = [
             ('Housing', 'Rent, mortgage, property taxes', 0, '#FF5733'),
