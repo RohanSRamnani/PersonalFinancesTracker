@@ -183,9 +183,20 @@ def load_from_database(db_path='finance_data.db', start_date=None, end_date=None
         
         df = pd.read_sql_query(query, conn, params=params)
         
-        # Convert date column to datetime
+        # Convert date column to datetime with flexible parsing
         if 'date' in df.columns and not df.empty:
-            df['date'] = pd.to_datetime(df['date'])
+            try:
+                # First try with format='mixed' which is more flexible (pandas >= 2.0)
+                df['date'] = pd.to_datetime(df['date'], format='mixed', errors='coerce')
+            except (ValueError, TypeError):
+                # If that fails (older pandas versions or other issues), fall back to infer_datetime_format
+                df['date'] = pd.to_datetime(df['date'], infer_datetime_format=True, errors='coerce')
+            
+            # Handle any dates that couldn't be parsed
+            if df['date'].isna().any():
+                print(f"Warning: Some dates could not be parsed properly")
+                # Replace NaT values with today's date
+                df.loc[df['date'].isna(), 'date'] = pd.Timestamp.today()
         
         conn.close()
         
@@ -326,7 +337,20 @@ def get_date_range(db_path='finance_data.db'):
         conn.close()
         
         if min_date and max_date:
-            return (pd.to_datetime(min_date), pd.to_datetime(max_date))
+            try:
+                min_date_dt = pd.to_datetime(min_date, format='mixed', errors='coerce')
+                max_date_dt = pd.to_datetime(max_date, format='mixed', errors='coerce')
+            except (ValueError, TypeError):
+                # Fall back to infer_datetime_format if format='mixed' is not supported
+                min_date_dt = pd.to_datetime(min_date, infer_datetime_format=True, errors='coerce')
+                max_date_dt = pd.to_datetime(max_date, infer_datetime_format=True, errors='coerce')
+                
+            # Check if the conversion succeeded
+            if pd.isna(min_date_dt) or pd.isna(max_date_dt):
+                print(f"Warning: Could not parse min_date or max_date properly")
+                return (None, None)
+                
+            return (min_date_dt, max_date_dt)
         return (None, None)
     except Exception as e:
         print(f"Error getting date range: {str(e)}")
