@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("View and Edit Transactions")
+st.title("Transaction View")
 
 # Initialize database path in session state if not already there
 if 'db_path' not in st.session_state:

@@ -5,7 +5,7 @@ from utils.database import load_from_database, check_db_exists, initialize_datab
 from utils.account_balance import get_account_balances, update_account_balance, get_total_balance
 
 st.set_page_config(
-    page_title="Personal Finance Tracker",
+    page_title="Dashboard - Personal Finance Tracker",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -24,7 +24,7 @@ def main():
         initialize_database(st.session_state.db_path)
     
     # Title and description
-    st.title("Personal Finance Dashboard")
+    st.title("Dashboard")
     st.markdown("""
     Your complete financial picture in one place. Track spending, budget, and measure progress over time.
     """)

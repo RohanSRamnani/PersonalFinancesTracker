@@ -1,0 +1,22 @@
+# Custom page configuration
+# This file controls the order and visibility of pages in the sidebar
+
+[pages]
+# The order here determines the order in the sidebar
+order = [
+    "app.py",                  # Dashboard (main page)
+    "pages/spending_analysis.py",
+    "pages/transaction_view.py",
+    "pages/budgeting.py",
+    "pages/accounts.py",
+    "pages/import_data.py"    # Import data at the bottom
+]
+
+# Custom names for pages
+[pages.rename]
+"app.py" = "Dashboard"
+"pages/import_data.py" = "Import Data"
+"pages/transaction_view.py" = "Transaction View"
+"pages/spending_analysis.py" = "Spending Analysis"
+"pages/budgeting.py" = "Budgeting"
+"pages/accounts.py" = "Account Balances"
