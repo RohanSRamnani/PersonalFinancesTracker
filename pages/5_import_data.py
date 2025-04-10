@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from utils.data_import import import_statement, detect_source_from_header, read_file_to_preview, detect_file_type
-from utils.categorization import categorize_transactions
+from utils.categorization import categorize_transactions, normalize_transaction_signs
 from utils.database import save_to_database, load_from_database
 
 st.set_page_config(
@@ -131,6 +131,9 @@ def main():
                             
                             # Auto-categorize transactions
                             df = categorize_transactions(df)
+                            
+                            # Normalize transaction signs (income positive, expenses negative)
+                            df = normalize_transaction_signs(df)
                             
                             # Preview categorized data
                             st.subheader("Categorized Transactions")

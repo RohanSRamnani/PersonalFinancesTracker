@@ -159,8 +159,30 @@ def main():
                 # Edit form
                 edit_category = st.selectbox("New Category", get_category_list(), index=get_category_list().index(transaction['category']) if transaction['category'] in get_category_list() else 0)
                 edit_description = st.text_input("New Description", transaction['description'])
-                edit_amount = st.number_input("New Amount", value=float(transaction['amount']), step=0.01)
+                
+                # Amount section with sign toggle
+                amount_col1, amount_col2 = st.columns([3, 1])
+                with amount_col1:
+                    # Always show the absolute value in the input field for easier editing
+                    abs_amount = abs(float(transaction['amount']))
+                    edit_amount = st.number_input("New Amount (absolute value)", value=abs_amount, min_value=0.0, step=0.01)
+                
+                with amount_col2:
+                    # Determine if current value is income or expense
+                    is_income = transaction['amount'] > 0
+                    transaction_type = st.radio(
+                        "Type",
+                        ["Income", "Expense"],
+                        index=0 if is_income else 1,
+                        help="Income will be stored as positive values, expenses as negative"
+                    )
+                    # Apply sign based on transaction type
+                    final_amount = edit_amount if transaction_type == "Income" else -edit_amount
+                
                 edit_date = st.date_input("New Date", transaction['date'])
+                
+                # Display the final amount with sign
+                st.info(f"Final amount: ${final_amount:.2f} ({'positive' if final_amount > 0 else 'negative'})")
                 
                 if st.button("Update Transaction"):
                     # Update each field if changed
@@ -170,8 +192,8 @@ def main():
                     if edit_description != transaction['description']:
                         update_transaction(edit_id, 'description', edit_description, st.session_state.db_path)
                     
-                    if edit_amount != transaction['amount']:
-                        update_transaction(edit_id, 'amount', edit_amount, st.session_state.db_path)
+                    if final_amount != float(transaction['amount']):
+                        update_transaction(edit_id, 'amount', final_amount, st.session_state.db_path)
                     
                     if pd.Timestamp(edit_date) != transaction['date'].date():
                         update_transaction(edit_id, 'date', edit_date.strftime('%Y-%m-%d'), st.session_state.db_path)

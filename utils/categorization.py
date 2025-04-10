@@ -158,3 +158,48 @@ def update_transaction_category(df, transaction_id, new_category):
     """
     df.at[transaction_id, 'category'] = new_category
     return df
+
+def get_income_categories():
+    """
+    Return a list of categories that are typically income (positive amounts)
+    
+    Returns:
+        list: List of income category names
+    """
+    return ['Income', 'Investments', 'Refund']
+    
+def normalize_transaction_signs(df):
+    """
+    Normalize transaction signs based on category - income categories should be positive, 
+    expense categories should be negative
+    
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing transactions with 'amount' and 'category' columns
+    
+    Returns:
+        pandas.DataFrame: DataFrame with normalized amount signs
+    """
+    # Make a copy to avoid SettingWithCopyWarning
+    df_copy = df.copy()
+    
+    # Get income categories
+    income_categories = get_income_categories()
+    
+    # Function to apply correct sign
+    def apply_sign(row):
+        # Skip if amount is zero
+        if row['amount'] == 0:
+            return row['amount']
+            
+        # If category is income
+        if row['category'] in income_categories:
+            # Amount should be positive
+            return abs(row['amount'])
+        else:
+            # Expense amounts should be negative
+            return -abs(row['amount'])
+    
+    # Apply the sign normalization
+    df_copy.loc[:, 'amount'] = df_copy.apply(apply_sign, axis=1)
+    
+    return df_copy
