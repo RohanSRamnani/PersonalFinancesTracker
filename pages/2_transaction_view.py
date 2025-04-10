@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils.database import load_from_database, delete_transaction, update_transaction, delete_transactions_by_source
+from utils.database import load_from_database, delete_transaction, update_transaction, delete_transactions_by_source, reindex_transactions_by_date
 from utils.categorization import get_category_list
 import datetime
 
@@ -239,6 +239,26 @@ def main():
                     st.error(f"Error deleting transactions from {bulk_delete_source}")
             elif st.button("Delete All Transactions from Source", key="bulk_delete_button_no_confirm") and not confirm_delete:
                 st.error("Please confirm the deletion by checking the box above")
+                
+        # Add a section for reindexing transactions by date
+        st.markdown("---")
+        st.subheader("Reindex Transactions by Date")
+        
+        st.info("""
+        This will reorder all transactions by date (oldest first) and reset transaction IDs 
+        to be sequential, starting from 1. This is useful if you want transaction IDs to match
+        the chronological order of your transactions.
+        """)
+        
+        # Require confirmation for reindexing
+        confirm_reindex = st.checkbox("I understand this will change all transaction IDs", key="confirm_reindex")
+        
+        if st.button("Reindex All Transactions by Date") and confirm_reindex:
+            if reindex_transactions_by_date(st.session_state.db_path):
+                st.success("Successfully reindexed all transactions by date")
+                st.rerun()
+            else:
+                st.error("Error reindexing transactions")
 
 if __name__ == "__main__":
     main()

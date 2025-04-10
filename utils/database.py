@@ -458,6 +458,68 @@ def get_categories(db_path='finance_data.db'):
         print(f"Error getting categories: {str(e)}")
         return pd.DataFrame()
 
+def reindex_transactions_by_date(db_path='finance_data.db'):
+    """
+    Reindex all transactions by date, assigning IDs sequentially from 1
+    starting with the oldest transaction
+    
+    Parameters:
+        db_path (str): Path to the SQLite database
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not check_db_exists(db_path):
+        return False
+        
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Begin transaction
+        cursor.execute("BEGIN TRANSACTION")
+        
+        # Create a temporary table to store transactions ordered by date
+        cursor.execute("""
+            CREATE TEMPORARY TABLE temp_transactions AS 
+            SELECT * FROM transactions ORDER BY date ASC
+        """)
+        
+        # Delete all from main table
+        cursor.execute("DELETE FROM transactions")
+        
+        # Reset the auto-increment counter
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name='transactions'")
+        
+        # Copy back from temp table - SQLite will assign new sequential IDs
+        cursor.execute("""
+            INSERT INTO transactions (date, description, amount, source, category, original_category)
+            SELECT date, description, amount, source, category, original_category 
+            FROM temp_transactions
+            ORDER BY date ASC
+        """)
+        
+        # Drop temporary table
+        cursor.execute("DROP TABLE temp_transactions")
+        
+        # Commit all changes
+        cursor.execute("COMMIT")
+        conn.close()
+        
+        return True
+    except Exception as e:
+        print(f"Error reindexing transactions by date: {str(e)}")
+        # If an error occurs, try to rollback
+        try:
+            if 'cursor' in locals() and cursor:
+                cursor.execute("ROLLBACK")
+            if 'conn' in locals() and conn:
+                conn.close()
+        except:
+            pass
+        return False
+
+
 def delete_transactions_by_source(source, db_path='finance_data.db', reindex=True):
     """
     Delete all transactions from a specific source and optionally reindex remaining transactions
