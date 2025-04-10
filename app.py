@@ -5,7 +5,7 @@ from utils.database import load_from_database, check_db_exists, initialize_datab
 from utils.account_balance import get_account_balances, update_account_balance, get_total_balance
 
 st.set_page_config(
-    page_title="Dashboard - Personal Finance Tracker",
+    page_title="Dashboard",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -125,7 +125,7 @@ def main():
         )
         
         # Add a small section to edit Wells Fargo balance directly
-        with st.expander("Quick Balance Update"):
+        with st.expander("Update Balance"):
             st.caption("Update your Wells Fargo balance without going to the Accounts page")
             quick_balance_col1, quick_balance_col2 = st.columns([3, 1])
             with quick_balance_col1:
@@ -152,10 +152,10 @@ def main():
         st.subheader("Recent Transactions")
         if not transactions.empty:
             recent = transactions.sort_values('date', ascending=False).head(5)
-            # Format the dataframe for display
-            recent_display = recent[['date', 'description', 'amount', 'category']]
-            recent_display['date'] = recent_display['date'].dt.strftime('%Y-%m-%d')
-            recent_display['amount'] = recent_display['amount'].map('${:,.2f}'.format)
+            # Format the dataframe for display - using .loc to avoid SettingWithCopyWarning
+            recent_display = recent[['date', 'description', 'amount', 'category']].copy()
+            recent_display.loc[:, 'date'] = recent_display['date'].dt.strftime('%Y-%m-%d')
+            recent_display.loc[:, 'amount'] = recent_display['amount'].map('${:,.2f}'.format)
             st.dataframe(recent_display, use_container_width=True)
         else:
             st.info("No transactions found. Import your financial data to get started.")

@@ -1,0 +1,96 @@
+rohan@Rohans-MBP-2 FinanceTracker % /usr/local/bin/python3 /Users/rohan/Downloads/FinanceTracker/app.py
+2025-04-10 01:57:42.357 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.state.session_state_proxy: Session state does not function when running a script without `streamlit run`
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.358 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.386 
+  Warning: to view this Streamlit app on a browser, run it with the following
+  command:
+
+    streamlit run /Users/rohan/Downloads/FinanceTracker/app.py [ARGUMENTS]
+2025-04-10 01:57:42.386 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.386 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.386 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.386 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.389 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.389 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.389 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.395 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.396 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+/Users/rohan/Downloads/FinanceTracker/app.py:157: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  recent_display['date'] = recent_display['date'].dt.strftime('%Y-%m-%d')
+/Users/rohan/Downloads/FinanceTracker/app.py:158: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  recent_display['amount'] = recent_display['amount'].map('${:,.2f}'.format)
+2025-04-10 01:57:42.398 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.398 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.398 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.398 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.400 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.400 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.400 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.400 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.400 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.400 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-04-10 01:57:42.401 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+rohan@Rohans-MBP-2 FinanceTracker % 
