@@ -162,7 +162,7 @@ def main():
     # Customize specific columns
     gb.configure_column('ID', width=70)
     gb.configure_column('date', width=110)
-    gb.configure_column('description', width=250)
+    gb.configure_column('description', width=250, filter=True)
     gb.configure_column('amount', width=110)
     gb.configure_column('category', width=150, filter=True)
     gb.configure_column('source', width=150, filter=True)
@@ -348,7 +348,7 @@ def main():
                 # Customize specific columns
                 gb_search.configure_column('ID', width=70)
                 gb_search.configure_column('date', width=110)
-                gb_search.configure_column('description', width=250)
+                gb_search.configure_column('description', width=250, filter=True)
                 gb_search.configure_column('amount', width=110)
                 gb_search.configure_column('category', width=150, filter=True)
                 gb_search.configure_column('source', width=150, filter=True)
