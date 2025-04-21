@@ -73,7 +73,7 @@ def main():
     if not monthly_spending.empty:
         # Show spending by category chart
         monthly_fig = plot_monthly_spending(monthly_spending)
-        st.plotly_chart(monthly_fig, use_container_width=True)
+        st.plotly_chart(monthly_fig, use_container_width=True, key="monthly_spending_chart")
         
         # Add Credit Card breakdown (next to the category breakdown)
         col1, col2 = st.columns(2)
@@ -83,7 +83,7 @@ def main():
             st.subheader("Spending Distribution by Category")
             cat_fig = plot_category_distribution(filtered_transactions)
             if cat_fig:
-                st.plotly_chart(cat_fig, use_container_width=True)
+                st.plotly_chart(cat_fig, use_container_width=True, key="category_distribution_1")
             else:
                 st.info("No expense data available.")
                 
@@ -92,7 +92,7 @@ def main():
             st.subheader("Spending by Credit Card")
             source_fig = spending_by_source(filtered_transactions)
             if source_fig:
-                st.plotly_chart(source_fig, use_container_width=True)
+                st.plotly_chart(source_fig, use_container_width=True, key="source_breakdown_1")
             else:
                 st.info("No data available for credit card breakdown.")
                 
@@ -151,7 +151,7 @@ def main():
             cat_fig = plot_category_distribution(filtered_transactions)
             
         if cat_fig:
-            st.plotly_chart(cat_fig, use_container_width=True)
+            st.plotly_chart(cat_fig, use_container_width=True, key="category_distribution_2")
         else:
             st.info("No expenses found for this selection.")
     
@@ -162,7 +162,7 @@ def main():
         inc_exp_fig = income_vs_expenses(filtered_transactions)
         
         if inc_exp_fig:
-            st.plotly_chart(inc_exp_fig, use_container_width=True)
+            st.plotly_chart(inc_exp_fig, use_container_width=True, key="income_vs_expenses")
         else:
             st.info("No data available for income vs expenses comparison.")
     
@@ -176,7 +176,7 @@ def main():
         trend_fig = plot_spending_trend(filtered_transactions, selected_category)
         
         if trend_fig:
-            st.plotly_chart(trend_fig, use_container_width=True)
+            st.plotly_chart(trend_fig, use_container_width=True, key="spending_trend")
         else:
             st.info("No trend data available for the selected category.")
     
@@ -190,7 +190,7 @@ def main():
         merchants_fig = plot_top_merchants(filtered_transactions, n_merchants)
         
         if merchants_fig:
-            st.plotly_chart(merchants_fig, use_container_width=True)
+            st.plotly_chart(merchants_fig, use_container_width=True, key="top_merchants")
         else:
             st.info("No merchant data available.")
     
