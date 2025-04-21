@@ -199,6 +199,30 @@ def main():
         4. **Create Budgets**: Set up budgets and track your actual spending against them
         """)
     
+    # Quick links for easy navigation
+    st.subheader("Quick Navigation")
+    
+    # Create a horizontal layout for the links
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📊 Spending Analysis", use_container_width=True):
+            st.switch_page("pages/1_spending_analysis.py")
+        if st.button("🏦 Manage Accounts", use_container_width=True):
+            st.switch_page("pages/4_accounts.py")
+    
+    with col2:
+        if st.button("📝 View Transactions", use_container_width=True):
+            st.switch_page("pages/2_transaction_view.py")
+        if st.button("📥 Import Data", use_container_width=True):
+            st.switch_page("pages/5_import_data.py")
+    
+    with col3:
+        if st.button("💰 Budgeting", use_container_width=True):
+            st.switch_page("pages/3_budgeting.py")
+        if st.button("🏷️ Manage Categories", use_container_width=True):
+            st.switch_page("pages/6_manage_categories.py")
+    
     st.markdown("""
     ## Get Started
     
@@ -207,6 +231,7 @@ def main():
     - View and edit transactions
     - Analyze your spending patterns
     - Create and track budgets
+    - Manage custom categories
     """)
 
 if __name__ == "__main__":

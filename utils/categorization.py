@@ -130,19 +130,158 @@ def map_original_category(original):
             
     return 'Miscellaneous'
 
-def get_category_list():
+def get_category_list(db_path='finance_data.db'):
     """
-    Return a list of all standard categories
+    Return a list of all categories including custom categories
     
+    Parameters:
+        db_path (str): Path to the SQLite database
+        
     Returns:
         list: List of category names
     """
-    return [
+    # Default categories
+    standard_categories = [
         'Groceries', 'Dining', 'Transportation', 'Shopping', 'Entertainment',
         'Housing', 'Utilities', 'Health', 'Insurance', 'Education',
         'Income', 'Investments', 'Subscriptions', 'Travel', 'Personal Care',
         'Gifts & Donations', 'Fees & Charges', 'Miscellaneous', 'Uncategorized'
     ]
+    
+    # Get any custom categories from the database
+    custom_categories = get_custom_categories(db_path)
+    
+    # Combine standard and custom categories, ensuring no duplicates
+    all_categories = list(set(standard_categories + custom_categories))
+    all_categories.sort()  # Sort alphabetically
+    
+    return all_categories
+
+def get_custom_categories(db_path='finance_data.db'):
+    """
+    Get custom categories from the database
+    
+    Parameters:
+        db_path (str): Path to the SQLite database
+    
+    Returns:
+        list: List of custom category names
+    """
+    import sqlite3
+    
+    try:
+        # Connect to SQLite database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Check if custom_categories table exists
+        cursor.execute('''
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='custom_categories'
+        ''')
+        
+        if cursor.fetchone() is None:
+            # Table doesn't exist, create it
+            cursor.execute('''
+                CREATE TABLE custom_categories (
+                    id INTEGER PRIMARY KEY,
+                    category_name TEXT UNIQUE
+                )
+            ''')
+            conn.commit()
+            return []
+        
+        # Fetch all custom categories
+        cursor.execute('SELECT category_name FROM custom_categories')
+        categories = [row[0] for row in cursor.fetchall()]
+        
+        conn.close()
+        return categories
+    
+    except Exception as e:
+        print(f"Error getting custom categories: {str(e)}")
+        return []
+
+def add_custom_category(category_name, db_path='finance_data.db'):
+    """
+    Add a new custom category to the database
+    
+    Parameters:
+        category_name (str): Name of the category to add
+        db_path (str): Path to the SQLite database
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    import sqlite3
+    
+    try:
+        # Validate category name
+        if not category_name or len(category_name.strip()) == 0:
+            return False
+        
+        # Connect to SQLite database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Ensure the table exists
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS custom_categories (
+                id INTEGER PRIMARY KEY,
+                category_name TEXT UNIQUE
+            )
+        ''')
+        
+        # Insert new category if it doesn't already exist
+        cursor.execute(
+            'INSERT OR IGNORE INTO custom_categories (category_name) VALUES (?)',
+            (category_name.strip(),)
+        )
+        
+        # Commit changes and close connection
+        conn.commit()
+        conn.close()
+        
+        # Check if anything was actually inserted (based on rowcount)
+        return cursor.rowcount > 0
+    
+    except Exception as e:
+        print(f"Error adding custom category: {str(e)}")
+        return False
+
+def delete_custom_category(category_name, db_path='finance_data.db'):
+    """
+    Delete a custom category from the database
+    
+    Parameters:
+        category_name (str): Name of the category to delete
+        db_path (str): Path to the SQLite database
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    import sqlite3
+    
+    try:
+        # Connect to SQLite database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Delete the category
+        cursor.execute(
+            'DELETE FROM custom_categories WHERE category_name = ?',
+            (category_name,)
+        )
+        
+        # Commit changes and close connection
+        conn.commit()
+        conn.close()
+        
+        return True
+    
+    except Exception as e:
+        print(f"Error deleting custom category: {str(e)}")
+        return False
 
 def update_transaction_category(df, transaction_id, new_category):
     """
