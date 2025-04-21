@@ -107,36 +107,78 @@ def main():
                     options=custom_categories
                 )
                 
-                if st.button("Delete Selected Category"):
-                    # Check if this category is used in any transaction
-                    category_used = False
-                    if not transactions.empty:
-                        category_used = transactions[transactions['category'] == category_to_delete].shape[0] > 0
-                    
-                    if category_used:
-                        st.warning(f"Category '{category_to_delete}' is currently used in transactions. Deleting will change these transactions to 'Miscellaneous'.")
+                # Manage confirmation state for category deletion
+                if 'delete_confirmation' not in st.session_state:
+                    st.session_state.delete_confirmation = False
+                
+                if 'delete_with_reclass_confirmation' not in st.session_state:
+                    st.session_state.delete_with_reclass_confirmation = False
+                
+                # Initial delete button
+                if not st.session_state.delete_confirmation and not st.session_state.delete_with_reclass_confirmation:
+                    if st.button("Delete Selected Category"):
+                        # Check if this category is used in any transaction
+                        category_used = False
+                        if not transactions.empty:
+                            category_used = transactions[transactions['category'] == category_to_delete].shape[0] > 0
                         
-                        # Option to proceed with reclassification
-                        if st.button("Proceed with Deletion and Reclassify Transactions"):
+                        if category_used:
+                            # If used, set the delete_with_reclass_confirmation state
+                            st.session_state.delete_with_reclass_confirmation = True
+                        else:
+                            # If not used, set the regular delete_confirmation state
+                            st.session_state.delete_confirmation = True
+                        
+                        st.rerun()
+                
+                # Simple delete confirmation (no reclassification needed)
+                elif st.session_state.delete_confirmation:
+                    st.info(f"Category '{category_to_delete}' is not used in any transactions and can be safely deleted.")
+                    
+                    col_yes, col_no = st.columns(2)
+                    
+                    with col_yes:
+                        if st.button("Yes, Delete Category", key="delete_confirm_yes"):
+                            if delete_custom_category(category_to_delete, st.session_state.db_path):
+                                st.session_state.delete_confirmation = False
+                                st.success(f"Category '{category_to_delete}' deleted successfully!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete category. Please try again.")
+                    
+                    with col_no:
+                        if st.button("No, Cancel", key="delete_confirm_no"):
+                            st.session_state.delete_confirmation = False
+                            st.rerun()
+                
+                # Delete with reclassification confirmation
+                elif st.session_state.delete_with_reclass_confirmation:
+                    # Count transactions that would be affected
+                    transactions_to_update = transactions[transactions['category'] == category_to_delete]
+                    count = len(transactions_to_update)
+                    
+                    st.warning(f"Category '{category_to_delete}' is currently used in {count} transactions. Deleting will change these transactions to 'Miscellaneous'.")
+                    
+                    col_yes, col_no = st.columns(2)
+                    
+                    with col_yes:
+                        if st.button("Yes, Delete & Reclassify", key="reclass_confirm_yes"):
                             # First update all transactions with this category to Miscellaneous
-                            transactions_to_update = transactions[transactions['category'] == category_to_delete]
-                            
                             for idx, transaction in transactions_to_update.iterrows():
                                 update_transaction(transaction['id'], 'category', 'Miscellaneous', st.session_state.db_path)
                             
                             # Then delete the category
                             if delete_custom_category(category_to_delete, st.session_state.db_path):
-                                st.success(f"Category '{category_to_delete}' deleted and {len(transactions_to_update)} transactions reclassified.")
+                                st.session_state.delete_with_reclass_confirmation = False
+                                st.success(f"Category '{category_to_delete}' deleted and {count} transactions reclassified.")
                                 st.rerun()
                             else:
                                 st.error("Failed to delete category. Please try again.")
-                    else:
-                        # Not used in any transaction, can delete directly
-                        if delete_custom_category(category_to_delete, st.session_state.db_path):
-                            st.success(f"Category '{category_to_delete}' deleted successfully!")
+                    
+                    with col_no:
+                        if st.button("No, Cancel", key="reclass_confirm_no"):
+                            st.session_state.delete_with_reclass_confirmation = False
                             st.rerun()
-                        else:
-                            st.error("Failed to delete category. Please try again.")
             else:
                 st.info("No custom categories have been added yet.")
         
@@ -152,28 +194,48 @@ def main():
             with col_b:
                 new_category = st.selectbox("To Category", all_categories, key="new_cat")
             
-            if st.button("Replace Categories"):
-                if old_category == new_category:
-                    st.error("The source and destination categories must be different.")
-                else:
-                    # Count how many transactions will be affected
-                    if not transactions.empty:
-                        affected_transactions = transactions[transactions['category'] == old_category]
-                        count = len(affected_transactions)
+            # Manage confirmation state for bulk replace
+            if 'bulk_replace_confirmation' not in st.session_state:
+                st.session_state.bulk_replace_confirmation = False
+            
+            if not st.session_state.bulk_replace_confirmation:
+                if st.button("Replace Categories"):
+                    if old_category == new_category:
+                        st.error("The source and destination categories must be different.")
+                    else:
+                        st.session_state.bulk_replace_confirmation = True
+                        st.rerun()
+            else:
+                # Count how many transactions will be affected
+                if not transactions.empty:
+                    affected_transactions = transactions[transactions['category'] == old_category]
+                    count = len(affected_transactions)
+                    
+                    if count > 0:
+                        # Confirm the replacement
+                        st.warning(f"This will change {count} transactions from '{old_category}' to '{new_category}'.")
                         
-                        if count > 0:
-                            # Confirm the replacement
-                            st.warning(f"This will change {count} transactions from '{old_category}' to '{new_category}'.")
-                            
-                            if st.button("Confirm Replacement"):
+                        col_yes, col_no = st.columns(2)
+                        
+                        with col_yes:
+                            if st.button("Yes, Replace Categories", key="bulk_confirm_yes"):
                                 # Update each transaction
                                 for idx, transaction in affected_transactions.iterrows():
                                     update_transaction(transaction['id'], 'category', new_category, st.session_state.db_path)
                                 
+                                st.session_state.bulk_replace_confirmation = False
                                 st.success(f"Successfully replaced {count} transactions from '{old_category}' to '{new_category}'.")
                                 st.rerun()
-                        else:
-                            st.info(f"No transactions found with category '{old_category}'.")
+                        
+                        with col_no:
+                            if st.button("No, Cancel", key="bulk_confirm_no"):
+                                st.session_state.bulk_replace_confirmation = False
+                                st.rerun()
+                    else:
+                        st.info(f"No transactions found with category '{old_category}'.")
+                        if st.button("Back"):
+                            st.session_state.bulk_replace_confirmation = False
+                            st.rerun()
         
         # Fourth tab: Search by Description and Recategorize
         with tabs[3]:
@@ -234,21 +296,38 @@ def main():
                             ]
                             st.write(f"Will update {len(filtered_transactions)} transactions that have category '{filter_current_category}'")
                         
-                        # Confirmation button with count of affected transactions
-                        if st.button(f"Update {len(filtered_transactions)} Transaction Categories"):
-                            # Confirm before proceeding
+                        # Manage confirmation state
+                        if 'update_confirmation_state' not in st.session_state:
+                            st.session_state.update_confirmation_state = False
+                        
+                        # Update button and confirmation
+                        if not st.session_state.update_confirmation_state:
+                            if st.button(f"Update {len(filtered_transactions)} Transaction Categories"):
+                                st.session_state.update_confirmation_state = True
+                                st.rerun()
+                        else:
+                            # Show confirmation warning and buttons
                             st.warning(f"This will update {len(filtered_transactions)} transactions matching '{description_search}' to category '{new_category}'.")
                             
-                            if st.button("Confirm Update", key="confirm_desc_update"):
-                                # Update each transaction
-                                update_count = 0
-                                for idx, transaction in filtered_transactions.iterrows():
-                                    if transaction['category'] != new_category:  # Only update if different
-                                        update_transaction(transaction['id'], 'category', new_category, st.session_state.db_path)
-                                        update_count += 1
-                                
-                                st.success(f"Successfully updated {update_count} transactions to category '{new_category}'.")
-                                st.rerun()
+                            col_yes, col_no = st.columns(2)
+                            
+                            with col_yes:
+                                if st.button("Yes, Update Categories", key="confirm_yes"):
+                                    # Update each transaction
+                                    update_count = 0
+                                    for idx, transaction in filtered_transactions.iterrows():
+                                        if transaction['category'] != new_category:  # Only update if different
+                                            update_transaction(transaction['id'], 'category', new_category, st.session_state.db_path)
+                                            update_count += 1
+                                    
+                                    st.session_state.update_confirmation_state = False
+                                    st.success(f"Successfully updated {update_count} transactions to category '{new_category}'.")
+                                    st.rerun()
+                            
+                            with col_no:
+                                if st.button("No, Cancel", key="confirm_no"):
+                                    st.session_state.update_confirmation_state = False
+                                    st.rerun()
                     else:
                         st.info(f"No transactions found with description containing '{description_search}'.")
                 else:
