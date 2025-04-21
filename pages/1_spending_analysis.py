@@ -5,9 +5,11 @@ from utils.database import load_from_database
 from utils.visualization import (
     monthly_spending_by_category, plot_monthly_spending,
     plot_category_distribution, income_vs_expenses,
-    plot_spending_trend, plot_top_merchants
+    plot_spending_trend, plot_top_merchants,
+    spending_by_source, get_category_transactions
 )
 import datetime
+import plotly.express as px
 
 st.set_page_config(
     page_title="Spending Analysis - Personal Finance Tracker",
@@ -65,14 +67,82 @@ def main():
     # Monthly Spending Overview
     st.header("Monthly Spending Overview")
     
-    # Calculate monthly spending by category
-    monthly_spending = monthly_spending_by_category(filtered_transactions)
+    # Add tabs for different views of monthly spending
+    tab1, tab2 = st.tabs(["By Category", "By Source (Credit Card)"])
     
-    if not monthly_spending.empty:
-        monthly_fig = plot_monthly_spending(monthly_spending)
-        st.plotly_chart(monthly_fig, use_container_width=True)
-    else:
-        st.info("No expenses found in the selected date range.")
+    with tab1:
+        # Calculate monthly spending by category
+        monthly_spending = monthly_spending_by_category(filtered_transactions)
+        
+        if not monthly_spending.empty:
+            monthly_fig = plot_monthly_spending(monthly_spending)
+            st.plotly_chart(monthly_fig, use_container_width=True)
+            
+            # Add interactive category selection
+            st.subheader("Click on a category to see transactions")
+            
+            # Get unique categories from transactions with expenses
+            expense_categories = filtered_transactions[filtered_transactions['amount'] < 0]['category'].unique().tolist()
+            expense_categories.sort()
+            
+            # Create category selector
+            selected_detail_category = st.selectbox("Select category to view transactions", 
+                                                   expense_categories)
+            
+            # Display transactions for selected category
+            if selected_detail_category:
+                cat_transactions = get_category_transactions(filtered_transactions, selected_detail_category)
+                
+                if not cat_transactions.empty:
+                    # Format for display
+                    display_df = cat_transactions.copy()
+                    display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+                    
+                    # Format amount column
+                    display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
+                    
+                    # Display transactions
+                    st.dataframe(display_df[['date', 'description', 'amount', 'source']], use_container_width=True)
+                else:
+                    st.info(f"No transactions found in category: {selected_detail_category}")
+        else:
+            st.info("No expenses found in the selected date range.")
+    
+    with tab2:
+        # Show breakdown by source (credit card)
+        source_fig = spending_by_source(filtered_transactions)
+        
+        if source_fig:
+            st.plotly_chart(source_fig, use_container_width=True)
+            
+            # Add source selection to see transactions by source
+            st.subheader("Select credit card/source to see transactions")
+            
+            # Get unique sources
+            sources = filtered_transactions['source'].unique().tolist()
+            sources.sort()
+            
+            # Source selector
+            selected_source = st.selectbox("Select source", sources)
+            
+            if selected_source:
+                # Filter transactions by source
+                source_transactions = filtered_transactions[filtered_transactions['source'] == selected_source].copy()
+                source_transactions = source_transactions[source_transactions['amount'] < 0]  # Only expenses
+                source_transactions = source_transactions.sort_values(by=['date', 'amount'], ascending=[False, True])
+                
+                if not source_transactions.empty:
+                    # Format for display
+                    display_df = source_transactions.copy()
+                    display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+                    display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
+                    
+                    # Display transactions
+                    st.dataframe(display_df[['date', 'description', 'amount', 'category']], use_container_width=True)
+                else:
+                    st.info(f"No expense transactions found for source: {selected_source}")
+        else:
+            st.info("No data available for source breakdown.")
     
     # Two charts side by side: Category Distribution and Income vs Expenses
     col1, col2 = st.columns(2)

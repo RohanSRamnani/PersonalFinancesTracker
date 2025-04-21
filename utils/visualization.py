@@ -308,3 +308,65 @@ def plot_top_merchants(df, n=10):
     )
     
     return fig
+
+def get_category_transactions(df, category):
+    """
+    Filter transactions to show only those from a specific category
+    
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing transactions
+        category (str): Category to filter by
+        
+    Returns:
+        pandas.DataFrame: Filtered DataFrame with transactions from the selected category
+    """
+    if df.empty or category is None:
+        return pd.DataFrame()
+        
+    # Filter transactions by category
+    filtered_df = df[df['category'] == category].copy()
+    
+    # Sort by date and amount (largest expense first)
+    filtered_df = filtered_df.sort_values(by=['date', 'amount'], ascending=[False, True])
+    
+    return filtered_df
+
+def spending_by_source(df):
+    """
+    Create a plotly pie chart showing distribution of spending across sources (credit cards)
+    
+    Parameters:
+        df (pandas.DataFrame): DataFrame containing transactions
+        
+    Returns:
+        plotly.graph_objects.Figure: Plotly figure object
+    """
+    if df.empty:
+        return None
+        
+    df = df.copy()
+    
+    # Filter for expenses only
+    expenses = df[df['amount'] < 0].copy()
+    
+    if expenses.empty:
+        return None
+    
+    # Group by source and sum expenses
+    source_sums = expenses.groupby('source')['amount'].sum()
+    source_totals = np.abs(source_sums)
+    source_totals = source_totals.sort_values(ascending=False)
+    
+    # Create plotly pie chart
+    fig = px.pie(
+        values=source_totals.values,
+        names=source_totals.index,
+        title='Spending by Source',
+        height=400
+    )
+    
+    # Customize layout
+    fig.update_traces(textposition='inside', textinfo='percent+label+value')
+    fig.update_layout(uniformtext_minsize=12, uniformtext_mode='hide')
+    
+    return fig
