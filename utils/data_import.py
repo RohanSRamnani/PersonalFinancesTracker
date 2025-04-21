@@ -307,9 +307,27 @@ def import_statement(filepath, source, sheet_name=None):
         if 'original_category' not in df.columns:
             df['original_category'] = None
         
-        # Clean up amount field - ensure it's a float
+        # Clean up amount field - ensure it's a float and handle financial format
         if df['amount'].dtype == 'object':
-            df['amount'] = df['amount'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+            # Convert to string for processing
+            df['amount'] = df['amount'].astype(str)
+            
+            # Process amounts with financial format:
+            # 1. Handle parentheses (900) as negative values
+            # 2. Remove currency symbols and commas
+            def parse_financial_amount(amount_str):
+                # Remove currency symbols and spaces
+                amount_str = amount_str.strip().replace('$', '').replace(',', '')
+                
+                # Check if value is in parentheses (900) which means negative
+                if amount_str.startswith('(') and amount_str.endswith(')'):
+                    # Remove parentheses and make negative
+                    return -float(amount_str[1:-1])
+                else:
+                    return float(amount_str)
+            
+            # Apply the financial parsing function
+            df['amount'] = df['amount'].apply(lambda x: parse_financial_amount(x) if isinstance(x, str) else x)
         
         # Select only the columns we need
         return df[['date', 'description', 'amount', 'source', 'category', 'original_category']]
