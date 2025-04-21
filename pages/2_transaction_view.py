@@ -132,24 +132,36 @@ def main():
     display_subset = display_subset.set_index('id')
     display_subset.index.name = 'ID'  # Rename the index
     
-    # Display dataframe with filter capability
-    st.dataframe(
+    # Display dataframe with Excel-like filter capability
+    st.data_editor(
         display_subset[['date', 'description', 'amount', 'category', 'source']], 
         use_container_width=True,
+        hide_index=False,
         column_config={
-            "category": st.column_config.SelectboxColumn(
+            "date": st.column_config.DateColumn(
+                "date",
+                format="YYYY-MM-DD",
+                width="medium"
+            ),
+            "description": st.column_config.TextColumn(
+                "description",
+                width="large"
+            ),
+            "amount": st.column_config.TextColumn(
+                "amount",
+                width="medium"
+            ),
+            "category": st.column_config.TextColumn(
                 "category",
-                help="Click on ⋮ to filter by category",
-                width="medium",
-                options=sorted(filtered_transactions['category'].unique().tolist()),
+                width="medium"
             ),
-            "source": st.column_config.SelectboxColumn(
-                "source", 
-                help="Click on ⋮ to filter by source",
-                width="medium",
-                options=sorted(filtered_transactions['source'].unique().tolist()),
-            ),
-        }
+            "source": st.column_config.TextColumn(
+                "source",
+                width="medium"
+            )
+        },
+        disabled=True,
+        num_rows="fixed"
     )
     
     # Edit transaction section
@@ -298,24 +310,35 @@ def main():
                 display_results = display_results.set_index('id')
                 display_results.index.name = 'ID'
                 
-                # Show search results in a table with filter capability
-                st.dataframe(
+                # Show search results in a table with Excel-like filter capability
+                st.data_editor(
                     display_results[['date', 'description', 'amount', 'category', 'source']], 
                     use_container_width=True,
+                    hide_index=False,
                     column_config={
-                        "category": st.column_config.SelectboxColumn(
+                        "date": st.column_config.TextColumn(
+                            "date",
+                            width="medium"
+                        ),
+                        "description": st.column_config.TextColumn(
+                            "description",
+                            width="large"
+                        ),
+                        "amount": st.column_config.TextColumn(
+                            "amount",
+                            width="medium"
+                        ),
+                        "category": st.column_config.TextColumn(
                             "category",
-                            help="Click on ⋮ to filter by category",
-                            width="medium",
-                            options=sorted(display_results['category'].unique().tolist()),
+                            width="medium"
                         ),
-                        "source": st.column_config.SelectboxColumn(
-                            "source", 
-                            help="Click on ⋮ to filter by source",
-                            width="medium",
-                            options=sorted(display_results['source'].unique().tolist()),
-                        ),
-                    }
+                        "source": st.column_config.TextColumn(
+                            "source",
+                            width="medium"
+                        )
+                    },
+                    disabled=True,
+                    num_rows="fixed"
                 )
                 
                 # Selection for which transaction to edit
