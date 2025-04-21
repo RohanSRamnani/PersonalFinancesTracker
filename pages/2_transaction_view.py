@@ -173,11 +173,7 @@ def main():
     # Configure grid options
     gridOptions = gb.build()
     
-    # Add note about filtering
-    st.info("""
-    📌 Click on the filter icon (funnel) in any column header to filter with checkboxes.
-    The category and source columns have Excel-like filtering with checkboxes for each unique value.
-    """)
+    # No info text as requested
     
     # Create the AgGrid component
     AgGrid(
@@ -363,11 +359,7 @@ def main():
                 # Configure grid options
                 gridOptions_search = gb_search.build()
                 
-                # Add note about filtering
-                st.info("""
-                📌 Click on the filter icon (funnel) in any column header to filter with checkboxes.
-                The category and source columns have Excel-like filtering with checkboxes for each unique value.
-                """)
+                # No info text as requested
                 
                 # Create the AgGrid component for search results
                 AgGrid(
