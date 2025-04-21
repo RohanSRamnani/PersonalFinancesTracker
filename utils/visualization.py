@@ -26,7 +26,9 @@ def monthly_spending_by_category(df):
     df['month_year'] = df['date'].dt.to_period('M')
     
     # Group by month and category, sum the amounts (only expenses)
-    monthly_cat = df[df['amount'] < 0].groupby(['month_year', 'category'])['amount'].sum().abs().reset_index()
+    monthly_cat = df[df['amount'] < 0].groupby(['month_year', 'category'])['amount'].sum()
+    monthly_cat = np.abs(monthly_cat)
+    monthly_cat = monthly_cat.reset_index()
     
     # Pivot to get categories as columns
     pivot_table = monthly_cat.pivot_table(
@@ -112,7 +114,8 @@ def plot_category_distribution(df, month=None):
     
     # Group by category and sum
     if not df[mask].empty:
-        category_totals = df[mask].groupby('category')['amount'].sum().abs().sort_values(ascending=False)
+        category_sums = df[mask].groupby('category')['amount'].sum()
+        category_totals = np.abs(category_sums).sort_values(ascending=False)
         
         # Create plotly pie chart
         fig = px.pie(
@@ -151,7 +154,7 @@ def income_vs_expenses(df):
     monthly = df.groupby(['month_year']).apply(
         lambda x: pd.Series({
             'Income': x[x['amount'] > 0]['amount'].sum(),
-            'Expenses': x[x['amount'] < 0]['amount'].sum().abs(),
+            'Expenses': np.abs(x[x['amount'] < 0]['amount'].sum()),
             'Net': x['amount'].sum()
         })
     ).reset_index()
@@ -228,7 +231,9 @@ def plot_spending_trend(df, category=None):
     
     # Group by month and sum expenses
     expenses['month_year'] = expenses['date'].dt.to_period('M')
-    monthly_expenses = expenses.groupby('month_year')['amount'].sum().abs().reset_index()
+    monthly_sums = expenses.groupby('month_year')['amount'].sum()
+    monthly_abs = np.abs(monthly_sums)
+    monthly_expenses = monthly_abs.reset_index()
     monthly_expenses['month_year'] = monthly_expenses['month_year'].dt.to_timestamp()
     
     # Create plotly line chart
@@ -276,7 +281,8 @@ def plot_top_merchants(df, n=10):
         return None
     
     # Group by description and sum expenses
-    merchant_totals = expenses.groupby('description')['amount'].sum().abs()
+    merchant_sums = expenses.groupby('description')['amount'].sum()
+    merchant_totals = np.abs(merchant_sums)
     
     # Get top n merchants
     top_merchants = merchant_totals.nlargest(n).sort_values(ascending=True)
