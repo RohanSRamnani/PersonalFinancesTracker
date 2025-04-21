@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from utils.database import load_from_database
 from utils.visualization import (
     monthly_spending_by_category, plot_monthly_spending,
@@ -136,7 +137,8 @@ def main():
     
     # Calculate statistics
     total_income = filtered_transactions[filtered_transactions['amount'] > 0]['amount'].sum()
-    total_expenses = filtered_transactions[filtered_transactions['amount'] < 0]['amount'].sum().abs()
+    expenses_sum = filtered_transactions[filtered_transactions['amount'] < 0]['amount'].sum()
+    total_expenses = np.abs(expenses_sum)
     net_cashflow = total_income - total_expenses
     
     # Display statistics
@@ -148,7 +150,9 @@ def main():
     st.header("Category Breakdown")
     
     # Group expenses by category
-    category_expenses = filtered_transactions[filtered_transactions['amount'] < 0].groupby('category')['amount'].sum().abs().sort_values(ascending=False).reset_index()
+    category_sums = filtered_transactions[filtered_transactions['amount'] < 0].groupby('category')['amount'].sum()
+    category_abs = np.abs(category_sums)
+    category_expenses = category_abs.sort_values(ascending=False).reset_index()
     
     # Calculate percentage of total
     category_expenses['percentage'] = (category_expenses['amount'] / total_expenses * 100).round(2)
