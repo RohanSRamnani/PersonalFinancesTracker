@@ -132,105 +132,25 @@ def main():
     display_subset = display_subset.set_index('id')
     display_subset.index.name = 'ID'  # Rename the index
     
-    # Add Excel-like column filters to the dataframe using AgGrid
-    st.subheader("Transaction Table with Excel-like Filters")
-    st.info("Click on the column headers to filter the data, just like in Excel!")
-    
-    # Create columns for display controls
-    control_col1, control_col2, control_col3 = st.columns([2, 2, 1])
-    
-    with control_col1:
-        # Add option to show/hide columns
-        columns_to_display = st.multiselect(
-            "Select columns to display",
-            options=['date', 'description', 'amount', 'category', 'source'],
-            default=['date', 'description', 'amount', 'category', 'source']
-        )
-    
-    with control_col2:
-        # Option to highlight rows by condition (similar to Excel conditional formatting)
-        highlight_option = st.selectbox(
-            "Highlight rows where:",
-            options=[
-                "No highlighting",
-                "Amount > 0 (Income/Payments)",
-                "Amount < 0 (Expenses)",
-                "Category = Shopping",
-                "Category = Dining"
-            ]
-        )
-    
-    with control_col3:
-        # Quick filter buttons for common operations
-        st.write("Quick Filters")
-        quick_filter_col1, quick_filter_col2 = st.columns(2)
-        
-        # Initialize quick filter state if not exists
-        if 'quick_filter_state' not in st.session_state:
-            st.session_state.quick_filter_state = {
-                'show_income': True,
-                'show_expenses': True,
-            }
-            
-        with quick_filter_col1:
-            if st.button("Show Income", type="primary" if st.session_state.quick_filter_state['show_income'] else "secondary"):
-                # Toggle income visibility
-                st.session_state.quick_filter_state['show_income'] = not st.session_state.quick_filter_state['show_income']
-                st.rerun()
-                
-        with quick_filter_col2:
-            if st.button("Show Expenses", type="primary" if st.session_state.quick_filter_state['show_expenses'] else "secondary"):
-                # Toggle expense visibility
-                st.session_state.quick_filter_state['show_expenses'] = not st.session_state.quick_filter_state['show_expenses']
-                st.rerun()
-    
-    # Apply quick filters to the dataframe
-    if 'quick_filter_state' in st.session_state:
-        # Create a copy so we don't modify the original
-        filtered_subset = display_subset.copy()
-        
-        # Filter based on buttons
-        if not st.session_state.quick_filter_state['show_income']:
-            # Filter out income (positive amounts)
-            filtered_subset = filtered_subset[filtered_subset['amount'].str.startswith('$-')]
-        
-        if not st.session_state.quick_filter_state['show_expenses']:
-            # Filter out expenses (negative amounts)
-            filtered_subset = filtered_subset[~filtered_subset['amount'].str.startswith('$-')]
-        
-        # Use the filtered subset for display
-        display_subset = filtered_subset
-    
-    # Initialize styler variable
-    styler = None
-    
-    # Apply highlighting styles if selected
-    if highlight_option != "No highlighting":
-        if highlight_option == "Amount > 0 (Income/Payments)":
-            styler = display_subset.style.apply(
-                lambda row: ['background-color: #c6efce' if row['amount'].startswith('$') and not row['amount'].startswith('$-') else '' for _ in row],
-                axis=1
-            )
-        elif highlight_option == "Amount < 0 (Expenses)":
-            styler = display_subset.style.apply(
-                lambda row: ['background-color: #ffc7ce' if row['amount'].startswith('$-') else '' for _ in row],
-                axis=1
-            )
-        elif "Category =" in highlight_option:
-            category = highlight_option.split("=")[1].strip()
-            styler = display_subset.style.apply(
-                lambda row: ['background-color: #ffeb9c' if row['category'] == category else '' for _ in row],
-                axis=1
-            )
-            
-        # Display with styling if styler is defined
-        if styler is not None:
-            st.dataframe(styler[columns_to_display], use_container_width=True)
-        else:
-            st.dataframe(display_subset[columns_to_display], use_container_width=True)
-    else:
-        # No styling, just show the dataframe
-        st.dataframe(display_subset[columns_to_display], use_container_width=True)
+    # Display dataframe with filter capability
+    st.dataframe(
+        display_subset[['date', 'description', 'amount', 'category', 'source']], 
+        use_container_width=True,
+        column_config={
+            "category": st.column_config.SelectboxColumn(
+                "category",
+                help="Click on ⋮ to filter by category",
+                width="medium",
+                options=sorted(filtered_transactions['category'].unique().tolist()),
+            ),
+            "source": st.column_config.SelectboxColumn(
+                "source", 
+                help="Click on ⋮ to filter by source",
+                width="medium",
+                options=sorted(filtered_transactions['source'].unique().tolist()),
+            ),
+        }
+    )
     
     # Edit transaction section
     st.markdown("---")
@@ -378,9 +298,25 @@ def main():
                 display_results = display_results.set_index('id')
                 display_results.index.name = 'ID'
                 
-                # Show search results in a table
-                st.dataframe(display_results[['date', 'description', 'amount', 'category', 'source']], 
-                           use_container_width=True)
+                # Show search results in a table with filter capability
+                st.dataframe(
+                    display_results[['date', 'description', 'amount', 'category', 'source']], 
+                    use_container_width=True,
+                    column_config={
+                        "category": st.column_config.SelectboxColumn(
+                            "category",
+                            help="Click on ⋮ to filter by category",
+                            width="medium",
+                            options=sorted(display_results['category'].unique().tolist()),
+                        ),
+                        "source": st.column_config.SelectboxColumn(
+                            "source", 
+                            help="Click on ⋮ to filter by source",
+                            width="medium",
+                            options=sorted(display_results['source'].unique().tolist()),
+                        ),
+                    }
+                )
                 
                 # Selection for which transaction to edit
                 selected_id = st.selectbox("Select Transaction ID to Edit", 
