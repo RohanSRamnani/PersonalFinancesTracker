@@ -130,8 +130,9 @@ def main():
     # Set the ID as the index but don't show it as a column
     display_subset = display_df.iloc[start_idx:end_idx].copy()
     
-    # Format amount with dollar sign for display
-    display_subset['amount'] = display_subset['amount'].map('${:,.2f}'.format)
+    # Format amount with dollar sign for display if it's not already a string
+    if not pd.api.types.is_string_dtype(display_subset['amount']):
+        display_subset['amount'] = display_subset['amount'].apply(lambda x: f"${x:,.2f}")
     
     # Set index to ID
     display_subset = display_subset.set_index('id')
@@ -314,7 +315,10 @@ def main():
                 # Create a copy for display formatting
                 display_results = search_results.copy()
                 display_results['date'] = display_results['date'].dt.strftime('%Y-%m-%d')
-                display_results['amount'] = display_results['amount'].map('${:,.2f}'.format)
+                
+                # Format amount with dollar sign for display if it's not already a string
+                if not pd.api.types.is_string_dtype(display_results['amount']):
+                    display_results['amount'] = display_results['amount'].apply(lambda x: f"${x:,.2f}")
                 
                 # Set the transaction ID as the index for better visibility
                 display_results = display_results.set_index('id')
