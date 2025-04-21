@@ -130,6 +130,39 @@ def main():
                         for source, amount in source_abs.items():
                             st.markdown(f"- {source}: ${amount:,.2f}")
                     
+                    # Add monthly breakdown
+                    st.markdown("**Monthly Breakdown:**")
+                    # Extract year-month from date and group by it
+                    cat_transactions['month'] = cat_transactions['date'].dt.strftime('%Y-%m')
+                    monthly_breakdown = cat_transactions.groupby('month')['amount'].sum().sort_index(ascending=False)
+                    monthly_abs = np.abs(monthly_breakdown)
+                    
+                    # Display as a bar chart
+                    fig = px.bar(
+                        x=monthly_abs.index,
+                        y=monthly_abs.values,
+                        labels={'x': 'Month', 'y': f'Spending in {category} ($)'},
+                        title=f"Monthly Spending in {category}",
+                        color_discrete_sequence=['#ff6b6b']
+                    )
+                    fig.update_layout(xaxis_title='Month', yaxis_title='Amount ($)')
+                    
+                    # Add dollar amounts as text on bars
+                    fig.update_traces(
+                        text=[f"${x:,.2f}" for x in monthly_abs.values],
+                        textposition='outside'
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True, key=f"monthly_breakdown_{category}")
+                    
+                    # Add monthly data in table format too
+                    monthly_data = pd.DataFrame({
+                        'Month': monthly_abs.index,
+                        'Amount': monthly_abs.values
+                    })
+                    monthly_data['Amount'] = monthly_data['Amount'].map('${:,.2f}'.format)
+                    st.dataframe(monthly_data, use_container_width=True)
+                    
                     # Display transactions table
                     st.markdown("**Transactions:**")
                     st.dataframe(display_df[['date', 'description', 'amount', 'source']], use_container_width=True)
