@@ -129,18 +129,28 @@ def main():
     # Display paginated transactions
     # Set the ID as the index but don't show it as a column
     display_subset = display_df.iloc[start_idx:end_idx].copy()
+    
+    # Format amount with dollar sign for display
+    display_subset['amount'] = display_subset['amount'].map('${:,.2f}'.format)
+    
+    # Set index to ID
     display_subset = display_subset.set_index('id')
     display_subset.index.name = 'ID'  # Rename the index
     
+    # Format date as string to avoid data type compatibility issues
+    display_subset_formatted = display_subset.copy()
+    # Convert date column to string if it's a datetime
+    if pd.api.types.is_datetime64_any_dtype(display_subset_formatted['date']):
+        display_subset_formatted['date'] = display_subset_formatted['date'].dt.strftime('%Y-%m-%d')
+        
     # Display dataframe with Excel-like filter capability
     st.data_editor(
-        display_subset[['date', 'description', 'amount', 'category', 'source']], 
+        display_subset_formatted[['date', 'description', 'amount', 'category', 'source']], 
         use_container_width=True,
         hide_index=False,
         column_config={
-            "date": st.column_config.DateColumn(
+            "date": st.column_config.TextColumn(
                 "date",
-                format="YYYY-MM-DD",
                 width="medium"
             ),
             "description": st.column_config.TextColumn(
