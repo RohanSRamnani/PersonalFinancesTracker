@@ -165,19 +165,24 @@ def main():
                 with amount_col1:
                     # Always show the absolute value in the input field for easier editing
                     abs_amount = abs(float(transaction['amount']))
-                    edit_amount = st.number_input("New Amount (absolute value)", value=abs_amount, min_value=0.0, step=0.01)
+                    edit_amount = st.number_input("New Amount", value=abs_amount, min_value=0.0, step=0.01)
                 
                 with amount_col2:
-                    # Determine if current value is income or expense
-                    is_income = transaction['amount'] > 0
+                    # Determine if current value is income, payment or expense
+                    is_positive = transaction['amount'] > 0
+                    # Default to Income for positive amounts, Expense for negative
                     transaction_type = st.radio(
                         "Type",
-                        ["Income", "Expense"],
-                        index=0 if is_income else 1,
-                        help="Income will be stored as positive values, expenses as negative"
+                        ["Income", "Payment", "Expense"],
+                        index=0 if is_positive else 2,
+                        help="Income and Payment will be stored as positive values, expenses as negative"
                     )
                     # Apply sign based on transaction type
-                    final_amount = edit_amount if transaction_type == "Income" else -edit_amount
+                    if transaction_type == "Expense":
+                        final_amount = -edit_amount
+                    else:
+                        # Both Income and Payment are positive
+                        final_amount = edit_amount
                 
                 edit_date = st.date_input("New Date", transaction['date'])
                 
