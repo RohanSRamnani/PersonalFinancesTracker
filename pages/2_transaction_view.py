@@ -3,6 +3,7 @@ import pandas as pd
 from utils.database import load_from_database, delete_transaction, update_transaction, delete_transactions_by_source, reindex_transactions_by_date
 from utils.categorization import get_category_list
 import datetime
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 st.set_page_config(
     page_title="Transactions - Personal Finance Tracker",
@@ -144,66 +145,49 @@ def main():
     if pd.api.types.is_datetime64_any_dtype(display_subset_formatted['date']):
         display_subset_formatted['date'] = display_subset_formatted['date'].dt.strftime('%Y-%m-%d')
     
-    # Add additional filter options above the table specifically for category and source
-    st.subheader("Table Filters")
-    filter_col1, filter_col2 = st.columns(2)
+    # Reset index to make ID a column for AgGrid
+    display_subset = display_subset.reset_index()
     
-    with filter_col1:
-        # Get unique categories from the current display subset
-        unique_categories = sorted(display_subset_formatted['category'].unique().tolist())
-        selected_table_categories = st.multiselect(
-            "Filter by Category (shows all if none selected)",
-            options=unique_categories,
-            default=[],
-            key="table_category_filter"
-        )
+    # Configure AgGrid options
+    gb = GridOptionsBuilder.from_dataframe(display_subset[['ID', 'date', 'description', 'amount', 'category', 'source']])
     
-    with filter_col2:
-        # Get unique sources from the current display subset
-        unique_sources = sorted(display_subset_formatted['source'].unique().tolist())
-        selected_table_sources = st.multiselect(
-            "Filter by Source (shows all if none selected)",
-            options=unique_sources,
-            default=[],
-            key="table_source_filter"
-        )
+    # Enable filtering for all columns
+    gb.configure_default_column(
+        filterable=True,
+        resizable=True,
+        sorteable=True,
+        editable=False
+    )
     
-    # Apply the filters to the displayed data
-    if selected_table_categories:
-        display_subset_formatted = display_subset_formatted[display_subset_formatted['category'].isin(selected_table_categories)]
+    # Customize specific columns
+    gb.configure_column('ID', width=70)
+    gb.configure_column('date', width=110)
+    gb.configure_column('description', width=250)
+    gb.configure_column('amount', width=110)
+    gb.configure_column('category', width=150, filter=True)
+    gb.configure_column('source', width=150, filter=True)
     
-    if selected_table_sources:
-        display_subset_formatted = display_subset_formatted[display_subset_formatted['source'].isin(selected_table_sources)]
+    # Configure pagination
+    gb.configure_pagination(enabled=True, paginationPageSize=rows_per_page)
     
-    # Display dataframe with standard Streamlit data_editor (keeping the ellipsis dropdown)
-    st.data_editor(
-        display_subset_formatted[['date', 'description', 'amount', 'category', 'source']], 
-        use_container_width=True,
-        hide_index=False,
-        column_config={
-            "date": st.column_config.TextColumn(
-                "date",
-                width="medium"
-            ),
-            "description": st.column_config.TextColumn(
-                "description",
-                width="large"
-            ),
-            "amount": st.column_config.TextColumn(
-                "amount",
-                width="medium"
-            ),
-            "category": st.column_config.TextColumn(
-                "category",
-                width="medium"
-            ),
-            "source": st.column_config.TextColumn(
-                "source",
-                width="medium"
-            )
-        },
-        disabled=True,
-        num_rows="fixed"
+    # Configure grid options
+    gridOptions = gb.build()
+    
+    # Add note about filtering
+    st.info("""
+    📌 Click on the filter icon (funnel) in any column header to filter with checkboxes.
+    The category and source columns have Excel-like filtering with checkboxes for each unique value.
+    """)
+    
+    # Create the AgGrid component
+    AgGrid(
+        display_subset,
+        gridOptions=gridOptions,
+        fit_columns_on_grid_load=False,
+        height=400,
+        enable_enterprise_modules=False,
+        theme="streamlit",
+        allow_unsafe_jscode=True
     )
     
     # Edit transaction section
@@ -351,72 +335,49 @@ def main():
                 if not pd.api.types.is_string_dtype(display_results['amount']):
                     display_results['amount'] = display_results['amount'].apply(lambda x: f"${x:,.2f}")
                 
-                # Set the transaction ID as the index for better visibility
-                display_results = display_results.set_index('id')
-                display_results.index.name = 'ID'
+                # Rename id column to ID for AgGrid
+                display_results = display_results.rename(columns={'id': 'ID'})
                 
-                # Add additional filter options above the table specifically for category and source
-                st.subheader("Search Results Filters")
-                search_filter_col1, search_filter_col2 = st.columns(2)
+                # Configure AgGrid options for search results
+                gb_search = GridOptionsBuilder.from_dataframe(display_results[['ID', 'date', 'description', 'amount', 'category', 'source']])
                 
-                with search_filter_col1:
-                    # Get unique categories from the current search results
-                    search_unique_categories = sorted(display_results['category'].unique().tolist())
-                    search_selected_categories = st.multiselect(
-                        "Filter by Category (shows all if none selected)",
-                        options=search_unique_categories,
-                        default=[],
-                        key="search_category_filter"
-                    )
+                # Enable filtering for all columns
+                gb_search.configure_default_column(
+                    filterable=True,
+                    resizable=True,
+                    sorteable=True,
+                    editable=False
+                )
                 
-                with search_filter_col2:
-                    # Get unique sources from the current search results
-                    search_unique_sources = sorted(display_results['source'].unique().tolist())
-                    search_selected_sources = st.multiselect(
-                        "Filter by Source (shows all if none selected)",
-                        options=search_unique_sources,
-                        default=[],
-                        key="search_source_filter"
-                    )
+                # Customize specific columns
+                gb_search.configure_column('ID', width=70)
+                gb_search.configure_column('date', width=110)
+                gb_search.configure_column('description', width=250)
+                gb_search.configure_column('amount', width=110)
+                gb_search.configure_column('category', width=150, filter=True)
+                gb_search.configure_column('source', width=150, filter=True)
                 
-                # Apply the filters to the displayed data
-                display_results_filtered = display_results.copy()
+                # Configure pagination
+                gb_search.configure_pagination(enabled=True, paginationPageSize=10)
                 
-                if search_selected_categories:
-                    display_results_filtered = display_results_filtered[display_results_filtered['category'].isin(search_selected_categories)]
+                # Configure grid options
+                gridOptions_search = gb_search.build()
                 
-                if search_selected_sources:
-                    display_results_filtered = display_results_filtered[display_results_filtered['source'].isin(search_selected_sources)]
+                # Add note about filtering
+                st.info("""
+                📌 Click on the filter icon (funnel) in any column header to filter with checkboxes.
+                The category and source columns have Excel-like filtering with checkboxes for each unique value.
+                """)
                 
-                # Show search results in a table with the standard Streamlit data_editor
-                st.data_editor(
-                    display_results_filtered[['date', 'description', 'amount', 'category', 'source']], 
-                    use_container_width=True,
-                    hide_index=False,
-                    column_config={
-                        "date": st.column_config.TextColumn(
-                            "date",
-                            width="medium"
-                        ),
-                        "description": st.column_config.TextColumn(
-                            "description",
-                            width="large"
-                        ),
-                        "amount": st.column_config.TextColumn(
-                            "amount",
-                            width="medium"
-                        ),
-                        "category": st.column_config.TextColumn(
-                            "category",
-                            width="medium"
-                        ),
-                        "source": st.column_config.TextColumn(
-                            "source",
-                            width="medium"
-                        )
-                    },
-                    disabled=True,
-                    num_rows="fixed"
+                # Create the AgGrid component for search results
+                AgGrid(
+                    display_results,
+                    gridOptions=gridOptions_search,
+                    fit_columns_on_grid_load=False,
+                    height=300,
+                    enable_enterprise_modules=False,
+                    theme="streamlit",
+                    allow_unsafe_jscode=True
                 )
                 
                 # Selection for which transaction to edit
