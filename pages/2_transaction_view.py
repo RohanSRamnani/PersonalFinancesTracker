@@ -3,6 +3,7 @@ import pandas as pd
 from utils.database import load_from_database, delete_transaction, update_transaction, delete_transactions_by_source, reindex_transactions_by_date
 from utils.categorization import get_category_list
 import datetime
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 st.set_page_config(
     page_title="Transactions - Personal Finance Tracker",
@@ -138,41 +139,47 @@ def main():
     display_subset = display_subset.set_index('id')
     display_subset.index.name = 'ID'  # Rename the index
     
-    # Format date as string to avoid data type compatibility issues
-    display_subset_formatted = display_subset.copy()
-    # Convert date column to string if it's a datetime
-    if pd.api.types.is_datetime64_any_dtype(display_subset_formatted['date']):
-        display_subset_formatted['date'] = display_subset_formatted['date'].dt.strftime('%Y-%m-%d')
-        
-    # Display dataframe with Excel-like filter capability
-    st.data_editor(
-        display_subset_formatted[['date', 'description', 'amount', 'category', 'source']], 
-        use_container_width=True,
-        hide_index=False,
-        column_config={
-            "date": st.column_config.TextColumn(
-                "date",
-                width="medium"
-            ),
-            "description": st.column_config.TextColumn(
-                "description",
-                width="large"
-            ),
-            "amount": st.column_config.TextColumn(
-                "amount",
-                width="medium"
-            ),
-            "category": st.column_config.TextColumn(
-                "category",
-                width="medium"
-            ),
-            "source": st.column_config.TextColumn(
-                "source",
-                width="medium"
-            )
-        },
-        disabled=True,
-        num_rows="fixed"
+    # Display dataframe with Excel-like filter capability using AgGrid
+    st.info("Click on the column headers to filter by specific values using checkboxes, just like in Excel")
+    
+    # Reset index to make ID a column
+    display_subset = display_subset.reset_index()
+    
+    # Configure AgGrid options
+    gb = GridOptionsBuilder.from_dataframe(display_subset[['ID', 'date', 'description', 'amount', 'category', 'source']])
+    
+    # Enable filtering for all columns
+    gb.configure_default_column(
+        filterable=True,
+        resizable=True,
+        sorteable=True,
+        editable=False
+    )
+    
+    # Customize specific columns
+    gb.configure_column('ID', width=70)
+    gb.configure_column('date', width=110)
+    gb.configure_column('description', width=250)
+    gb.configure_column('amount', width=110)
+    gb.configure_column('category', width=150)
+    gb.configure_column('source', width=150)
+    
+    # Configure pagination
+    gb.configure_pagination(enabled=True, paginationPageSize=rows_per_page)
+    
+    # Configure grid options with filter parameters
+    gridOptions = gb.build()
+    
+    # Create the AgGrid component
+    AgGrid(
+        display_subset,
+        gridOptions=gridOptions,
+        fit_columns_on_grid_load=False,
+        height=400,
+        enable_enterprise_modules=False,
+        theme="streamlit",
+        update_mode="MODEL_CHANGED",
+        allow_unsafe_jscode=True
     )
     
     # Edit transaction section
@@ -320,39 +327,47 @@ def main():
                 if not pd.api.types.is_string_dtype(display_results['amount']):
                     display_results['amount'] = display_results['amount'].apply(lambda x: f"${x:,.2f}")
                 
-                # Set the transaction ID as the index for better visibility
-                display_results = display_results.set_index('id')
-                display_results.index.name = 'ID'
+                # Rename id column to ID for consistency
+                display_results = display_results.rename(columns={'id': 'ID'})
                 
-                # Show search results in a table with Excel-like filter capability
-                st.data_editor(
-                    display_results[['date', 'description', 'amount', 'category', 'source']], 
-                    use_container_width=True,
-                    hide_index=False,
-                    column_config={
-                        "date": st.column_config.TextColumn(
-                            "date",
-                            width="medium"
-                        ),
-                        "description": st.column_config.TextColumn(
-                            "description",
-                            width="large"
-                        ),
-                        "amount": st.column_config.TextColumn(
-                            "amount",
-                            width="medium"
-                        ),
-                        "category": st.column_config.TextColumn(
-                            "category",
-                            width="medium"
-                        ),
-                        "source": st.column_config.TextColumn(
-                            "source",
-                            width="medium"
-                        )
-                    },
-                    disabled=True,
-                    num_rows="fixed"
+                # Show search results in a table with Excel-like filter capability using AgGrid
+                st.info("Click on the column headers to filter by specific values using checkboxes, just like in Excel")
+                
+                # Configure AgGrid options
+                gb_search = GridOptionsBuilder.from_dataframe(display_results[['ID', 'date', 'description', 'amount', 'category', 'source']])
+                
+                # Enable filtering for all columns
+                gb_search.configure_default_column(
+                    filterable=True,
+                    resizable=True,
+                    sorteable=True,
+                    editable=False
+                )
+                
+                # Customize specific columns
+                gb_search.configure_column('ID', width=70)
+                gb_search.configure_column('date', width=110)
+                gb_search.configure_column('description', width=250)
+                gb_search.configure_column('amount', width=110)
+                gb_search.configure_column('category', width=150)
+                gb_search.configure_column('source', width=150)
+                
+                # Configure pagination
+                gb_search.configure_pagination(enabled=True, paginationPageSize=10)
+                
+                # Configure grid options with filter parameters
+                gridOptions_search = gb_search.build()
+                
+                # Create the AgGrid component
+                AgGrid(
+                    display_results,
+                    gridOptions=gridOptions_search,
+                    fit_columns_on_grid_load=False,
+                    height=300,
+                    enable_enterprise_modules=False,
+                    theme="streamlit",
+                    update_mode="MODEL_CHANGED",
+                    allow_unsafe_jscode=True
                 )
                 
                 # Selection for which transaction to edit
