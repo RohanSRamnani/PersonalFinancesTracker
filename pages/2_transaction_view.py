@@ -135,78 +135,221 @@ def main():
     
     # Edit transaction section
     st.markdown("---")
-    st.subheader("Edit Transaction")
     
+    # Create columns for edit and delete sections
     col1, col2 = st.columns(2)
     
     with col1:
-        edit_id = st.number_input("Enter Transaction ID to Edit", min_value=1, step=1)
-    
-        if edit_id:
-            # Find transaction in dataframe
-            transaction = transactions[transactions['id'] == edit_id]
+        st.subheader("Edit Transaction")
+        
+        # Create tabs for different ways to find transactions to edit
+        edit_tabs = st.tabs(["Edit by ID", "Search and Edit"])
+        
+        with edit_tabs[0]:
+            # EDIT BY ID TAB
+            edit_id = st.number_input("Enter Transaction ID to Edit", min_value=1, step=1)
+        
+            if edit_id:
+                # Find transaction in dataframe
+                transaction = transactions[transactions['id'] == edit_id]
+                
+                if not transaction.empty:
+                    transaction = transaction.iloc[0]
+                    
+                    st.write("**Current Values:**")
+                    st.write(f"Date: {transaction['date'].strftime('%Y-%m-%d')}")
+                    st.write(f"Description: {transaction['description']}")
+                    st.write(f"Amount: ${transaction['amount']:.2f}")
+                    st.write(f"Category: {transaction['category']}")
+                    st.write(f"Source: {transaction['source']}")
+                    
+                    # Edit form
+                    edit_category = st.selectbox("New Category", get_category_list(), 
+                                                index=get_category_list().index(transaction['category']) 
+                                                if transaction['category'] in get_category_list() else 0)
+                    edit_description = st.text_input("New Description", transaction['description'])
+                    
+                    # Amount section with sign toggle
+                    amount_col1, amount_col2 = st.columns([3, 1])
+                    with amount_col1:
+                        # Always show the absolute value in the input field for easier editing
+                        abs_amount = abs(float(transaction['amount']))
+                        edit_amount = st.number_input("New Amount", value=abs_amount, min_value=0.0, step=0.01)
+                    
+                    with amount_col2:
+                        # Determine if current value is income, payment or expense
+                        is_positive = transaction['amount'] > 0
+                        # Default to Income for positive amounts, Expense for negative
+                        transaction_type = st.radio(
+                            "Type",
+                            ["Income", "Payment", "Expense"],
+                            index=0 if is_positive else 2,
+                            help="Income and Payment will be stored as positive values, expenses as negative"
+                        )
+                        # Apply sign based on transaction type
+                        if transaction_type == "Expense":
+                            final_amount = -edit_amount
+                        else:
+                            # Both Income and Payment are positive
+                            final_amount = edit_amount
+                    
+                    edit_date = st.date_input("New Date", transaction['date'])
+                    
+                    # Display the final amount with sign
+                    st.info(f"Final amount: ${final_amount:.2f} ({'positive' if final_amount > 0 else 'negative'})")
+                    
+                    if st.button("Update Transaction", key="update_by_id"):
+                        # Update each field if changed
+                        if edit_category != transaction['category']:
+                            update_transaction(edit_id, 'category', edit_category, st.session_state.db_path)
+                        
+                        if edit_description != transaction['description']:
+                            update_transaction(edit_id, 'description', edit_description, st.session_state.db_path)
+                        
+                        if final_amount != float(transaction['amount']):
+                            update_transaction(edit_id, 'amount', final_amount, st.session_state.db_path)
+                        
+                        if pd.Timestamp(edit_date) != transaction['date'].date():
+                            update_transaction(edit_id, 'date', edit_date.strftime('%Y-%m-%d'), st.session_state.db_path)
+                        
+                        st.success(f"Transaction {edit_id} updated successfully")
+                        st.rerun()
+                else:
+                    st.error(f"No transaction found with ID {edit_id}")
+        
+        with edit_tabs[1]:
+            # SEARCH AND EDIT TAB
+            st.subheader("Search for Transactions to Edit")
             
-            if not transaction.empty:
-                transaction = transaction.iloc[0]
+            # Search options
+            search_col1, search_col2 = st.columns(2)
+            
+            with search_col1:
+                search_description = st.text_input("Search by Description", 
+                                                placeholder="Enter keywords (e.g., 'Amazon', 'Coffee')")
                 
-                st.write("**Current Values:**")
-                st.write(f"Date: {transaction['date'].strftime('%Y-%m-%d')}")
-                st.write(f"Description: {transaction['description']}")
-                st.write(f"Amount: ${transaction['amount']:.2f}")
-                st.write(f"Category: {transaction['category']}")
-                st.write(f"Source: {transaction['source']}")
+            with search_col2:
+                search_category = st.selectbox("Filter by Category", 
+                                            ["All Categories"] + sorted(transactions['category'].unique().tolist()))
                 
-                # Edit form
-                edit_category = st.selectbox("New Category", get_category_list(), index=get_category_list().index(transaction['category']) if transaction['category'] in get_category_list() else 0)
-                edit_description = st.text_input("New Description", transaction['description'])
+            # Additional search filters if needed
+            search_col3, search_col4 = st.columns(2)
+            
+            with search_col3:
+                search_source = st.selectbox("Filter by Source", 
+                                           ["All Sources"] + sorted(transactions['source'].unique().tolist()))
                 
-                # Amount section with sign toggle
-                amount_col1, amount_col2 = st.columns([3, 1])
-                with amount_col1:
-                    # Always show the absolute value in the input field for easier editing
-                    abs_amount = abs(float(transaction['amount']))
-                    edit_amount = st.number_input("New Amount", value=abs_amount, min_value=0.0, step=0.01)
+            with search_col4:
+                search_type = st.selectbox("Filter by Type", 
+                                         ["All Types", "Income/Payment (Positive)", "Expense (Negative)"])
+            
+            # Apply filters to find matching transactions
+            search_results = transactions.copy()
+            
+            # Filter by description if provided
+            if search_description:
+                search_results = search_results[
+                    search_results['description'].str.contains(search_description, case=False)
+                ]
                 
-                with amount_col2:
-                    # Determine if current value is income, payment or expense
-                    is_positive = transaction['amount'] > 0
-                    # Default to Income for positive amounts, Expense for negative
-                    transaction_type = st.radio(
-                        "Type",
-                        ["Income", "Payment", "Expense"],
-                        index=0 if is_positive else 2,
-                        help="Income and Payment will be stored as positive values, expenses as negative"
-                    )
-                    # Apply sign based on transaction type
-                    if transaction_type == "Expense":
-                        final_amount = -edit_amount
-                    else:
-                        # Both Income and Payment are positive
-                        final_amount = edit_amount
+            # Filter by category if selected
+            if search_category != "All Categories":
+                search_results = search_results[search_results['category'] == search_category]
                 
-                edit_date = st.date_input("New Date", transaction['date'])
+            # Filter by source if selected
+            if search_source != "All Sources":
+                search_results = search_results[search_results['source'] == search_source]
                 
-                # Display the final amount with sign
-                st.info(f"Final amount: ${final_amount:.2f} ({'positive' if final_amount > 0 else 'negative'})")
+            # Filter by transaction type (positive/negative) if selected
+            if search_type == "Income/Payment (Positive)":
+                search_results = search_results[search_results['amount'] > 0]
+            elif search_type == "Expense (Negative)":
+                search_results = search_results[search_results['amount'] < 0]
+            
+            # Display search results
+            if len(search_results) > 0:
+                st.write(f"Found {len(search_results)} matching transactions")
                 
-                if st.button("Update Transaction"):
-                    # Update each field if changed
-                    if edit_category != transaction['category']:
-                        update_transaction(edit_id, 'category', edit_category, st.session_state.db_path)
+                # Create a copy for display formatting
+                display_results = search_results.copy()
+                display_results['date'] = display_results['date'].dt.strftime('%Y-%m-%d')
+                display_results['amount'] = display_results['amount'].map('${:,.2f}'.format)
+                
+                # Set the transaction ID as the index for better visibility
+                display_results = display_results.set_index('id')
+                display_results.index.name = 'ID'
+                
+                # Show search results in a table
+                st.dataframe(display_results[['date', 'description', 'amount', 'category', 'source']], 
+                           use_container_width=True)
+                
+                # Selection for which transaction to edit
+                selected_id = st.selectbox("Select Transaction ID to Edit", 
+                                         options=search_results['id'].tolist(),
+                                         format_func=lambda x: f"ID {x} - {search_results[search_results['id'] == x]['description'].values[0][:40]}")
+                
+                if selected_id:
+                    # Get the selected transaction
+                    transaction = transactions[transactions['id'] == selected_id].iloc[0]
                     
-                    if edit_description != transaction['description']:
-                        update_transaction(edit_id, 'description', edit_description, st.session_state.db_path)
+                    st.write("**Edit Selected Transaction:**")
+                    st.write(f"Date: {transaction['date'].strftime('%Y-%m-%d')}")
+                    st.write(f"Description: {transaction['description']}")
+                    st.write(f"Amount: ${transaction['amount']:.2f}")
                     
-                    if final_amount != float(transaction['amount']):
-                        update_transaction(edit_id, 'amount', final_amount, st.session_state.db_path)
+                    # Edit form for the selected transaction
+                    edit_category = st.selectbox("New Category", get_category_list(), 
+                                               index=get_category_list().index(transaction['category']) 
+                                               if transaction['category'] in get_category_list() else 0,
+                                               key="search_edit_category")
+                    edit_description = st.text_input("New Description", transaction['description'], key="search_edit_desc")
                     
-                    if pd.Timestamp(edit_date) != transaction['date'].date():
-                        update_transaction(edit_id, 'date', edit_date.strftime('%Y-%m-%d'), st.session_state.db_path)
+                    # Amount section with sign toggle
+                    amount_col1, amount_col2 = st.columns([3, 1])
+                    with amount_col1:
+                        abs_amount = abs(float(transaction['amount']))
+                        edit_amount = st.number_input("New Amount", value=abs_amount, min_value=0.0, step=0.01, 
+                                                    key="search_edit_amount")
                     
-                    st.success(f"Transaction {edit_id} updated successfully")
-                    st.rerun()
+                    with amount_col2:
+                        is_positive = transaction['amount'] > 0
+                        transaction_type = st.radio(
+                            "Type",
+                            ["Income", "Payment", "Expense"],
+                            index=0 if is_positive else 2,
+                            help="Income and Payment will be stored as positive values, expenses as negative",
+                            key="search_edit_type"
+                        )
+                        # Apply sign based on transaction type
+                        if transaction_type == "Expense":
+                            final_amount = -edit_amount
+                        else:
+                            # Both Income and Payment are positive
+                            final_amount = edit_amount
+                    
+                    edit_date = st.date_input("New Date", transaction['date'], key="search_edit_date")
+                    
+                    # Display the final amount with sign
+                    st.info(f"Final amount: ${final_amount:.2f} ({'positive' if final_amount > 0 else 'negative'})")
+                    
+                    if st.button("Update Transaction", key="update_from_search"):
+                        # Update each field if changed
+                        if edit_category != transaction['category']:
+                            update_transaction(selected_id, 'category', edit_category, st.session_state.db_path)
+                        
+                        if edit_description != transaction['description']:
+                            update_transaction(selected_id, 'description', edit_description, st.session_state.db_path)
+                        
+                        if final_amount != float(transaction['amount']):
+                            update_transaction(selected_id, 'amount', final_amount, st.session_state.db_path)
+                        
+                        if pd.Timestamp(edit_date) != transaction['date'].date():
+                            update_transaction(selected_id, 'date', edit_date.strftime('%Y-%m-%d'), st.session_state.db_path)
+                        
+                        st.success(f"Transaction {selected_id} updated successfully")
+                        st.rerun()
             else:
-                st.error(f"No transaction found with ID {edit_id}")
+                st.info("No transactions found matching your search criteria")
     
     with col2:
         # Delete transaction section
