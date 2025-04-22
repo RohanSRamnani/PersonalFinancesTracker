@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
-from utils.database import load_from_database, check_db_exists, initialize_database
+import uuid
+from utils.database import load_from_database, check_db_exists, initialize_database, save_to_database
 from utils.account_balance import get_account_balances, update_account_balance, get_total_balance
+from utils.data_import import import_statement, detect_source_from_header, read_file_to_preview, detect_file_type
+from utils.categorization import categorize_transactions, normalize_transaction_signs
 
 st.set_page_config(
     page_title="Dashboard",
@@ -186,12 +189,154 @@ def main():
     
     # No welcome message or instructions as requested
     
-    # Import Data button
+    # Import Data section
     st.subheader("Import Data")
     
-    # Button to import data
-    if st.button("📥 Import Data", use_container_width=True):
-        st.switch_page("pages/.5_import_data.py")
+    # Create temp_uploads directory if it doesn't exist
+    if not os.path.exists('temp_uploads'):
+        os.makedirs('temp_uploads', exist_ok=True)
+        # Set permissions to ensure we can write files
+        try:
+            os.chmod('temp_uploads', 0o777)
+        except:
+            pass
+    
+    # Import Data functionality
+    with st.expander("Import your financial statements"):
+        # Instructions
+        st.markdown("""
+        Upload your financial statements to import them into the system. 
+        The app supports statements from:
+        - Wells Fargo
+        - Chase
+        - Bank of America
+        - Apple Pay
+        - Schwab
+        
+        **Supported formats:** Excel (XLSX) files
+        """)
+        
+        # File upload - Excel only
+        uploaded_file = st.file_uploader("Upload statement file", type=["xlsx", "xls"])
+        
+        # Initialize temp_file_path outside of try/except blocks to avoid unbound variable issues
+        temp_file_path = None
+        
+        if uploaded_file is not None:
+            try:
+                # Save uploaded file temporarily
+                # Generate a unique ID to avoid name conflicts
+                unique_id = uuid.uuid4().hex
+                temp_file_path = f"temp_uploads/{unique_id}_{uploaded_file.name}"
+                with open(temp_file_path, "wb") as temp_file:
+                    temp_file.write(uploaded_file.getvalue())
+                
+                # Verify it's an Excel file
+                file_type = detect_file_type(temp_file_path)
+                
+                if file_type not in ['xlsx', 'xls']:
+                    st.error("Unsupported file format. Please upload an Excel (XLSX/XLS) file.")
+                else:
+                    # Show file type information
+                    st.info("Excel file detected. The system will extract transactions from the Excel data.")
+                    
+                    # Try to detect source from content
+                    detected_source = detect_source_from_header(temp_file_path)
+                    
+                    # Source selection
+                    source_options = ['wells_fargo', 'chase', 'bank_of_america', 'apple_pay', 'schwab']
+                    selected_source = st.selectbox(
+                        "Select financial institution", 
+                        source_options,
+                        index=source_options.index(detected_source) if detected_source in source_options else 0
+                    )
+                    
+                    # Add support for selecting Excel sheets
+                    sheet_name = None
+                    
+                    try:
+                        # Get list of sheet names
+                        excel_file = pd.ExcelFile(temp_file_path)
+                        all_sheets = excel_file.sheet_names
+                        
+                        if len(all_sheets) > 1:
+                            sheet_name = st.selectbox("Select sheet with transaction data:", all_sheets)
+                        else:
+                            # Use the first sheet if there's only one
+                            sheet_name = all_sheets[0] if all_sheets else None
+                            
+                        # Show preview of the file with selected sheet
+                        st.subheader("File Preview")
+                        with st.spinner("Generating preview..."):
+                            preview = read_file_to_preview(temp_file_path, sheet_name=sheet_name)
+                            st.dataframe(preview)
+                    except Exception as e:
+                        st.error(f"Error reading Excel file: {str(e)}")
+                        
+                    # Import button
+                    if st.button("Import Data"):
+                        with st.spinner("Importing and processing data..."):
+                            try:
+                                # Import, categorize, and save to database
+                                df = import_statement(temp_file_path, selected_source, sheet_name=sheet_name)
+                                
+                                if df.empty:
+                                    st.error("No transactions were found in the file. Please check the file format and try again.")
+                                else:
+                                    # Show import results
+                                    st.subheader("Import Results")
+                                    st.write(f"Imported {len(df)} transactions from {selected_source}")
+                                    
+                                    # Auto-categorize transactions
+                                    df = categorize_transactions(df)
+                                    
+                                    # Normalize transaction signs (income positive, expenses negative)
+                                    df = normalize_transaction_signs(df)
+                                    
+                                    # Preview categorized data
+                                    st.subheader("Categorized Transactions")
+                                    # Format date for display
+                                    display_df = df.copy()
+                                    display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+                                    display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
+                                    st.dataframe(display_df[['date', 'description', 'amount', 'category']])
+                                    
+                                    # Save to database
+                                    success = save_to_database(df, st.session_state.db_path)
+                                    
+                                    if success:
+                                        st.success("Data successfully imported and saved to database")
+                                        # Update transactions in session state
+                                        st.session_state.transactions = load_from_database(st.session_state.db_path)
+                                        st.rerun()  # Refresh the page to show updated data
+                                    else:
+                                        st.error("Error saving data to database")
+                            except Exception as e:
+                                st.error(f"Error during import: {str(e)}")
+                
+                # Clean up temporary file
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+            
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+                    
+    # Option to view existing data
+    with st.expander("View All Transactions"):
+        if st.button("Show All Transactions"):
+            transactions = load_from_database(st.session_state.db_path)
+            
+            if not transactions.empty:
+                st.write(f"Total transactions: {len(transactions)}")
+                
+                # Format for display
+                display_df = transactions.copy()
+                display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+                display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
+                
+                st.dataframe(display_df[['id', 'date', 'description', 'amount', 'category', 'source']])
 
 if __name__ == "__main__":
     main()
