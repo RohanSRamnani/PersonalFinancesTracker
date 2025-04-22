@@ -23,10 +23,8 @@ def main():
     if not check_db_exists(st.session_state.db_path):
         initialize_database(st.session_state.db_path)
     
-    # Title and description
+    # Title only, no subtitle text
     st.title("Dashboard")
-    # Simple subtitle without extra text
-    st.markdown("Your complete financial picture in one place.")
     
     # Load transactions from database
     transactions = load_from_database(st.session_state.db_path)
@@ -188,12 +186,12 @@ def main():
     
     # No welcome message or instructions as requested
     
-    # Quick links for easy navigation - only keeping the Import Data button
-    st.subheader("Quick Navigation")
+    # Import Data button
+    st.subheader("Import Data")
     
-    # Just a single button for Import Data
+    # Button to import data
     if st.button("📥 Import Data", use_container_width=True):
-        st.switch_page("pages/5_import_data.py")
+        st.switch_page("pages/_5_import_data.py")
 
 if __name__ == "__main__":
     main()

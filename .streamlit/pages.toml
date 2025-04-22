@@ -3,10 +3,11 @@
 
 [pages]
 # Format is: file_path = "Display Name"
-"app.py" = "Dashboard"
+"dashboard.py" = "Dashboard"
 "pages/1_spending_analysis.py" = "Spending Analysis"
 "pages/2_transaction_view.py" = "Transaction View"
 "pages/3_budgeting.py" = "Budgeting" 
 "pages/4_accounts.py" = "Accounts"
-"pages/5_import_data.py" = "Import Data"
+# Remove Import Data from sidebar - it's now only accessible from the dashboard
+# "pages/5_import_data.py" = "Import Data"
 "pages/6_manage_categories.py" = "Manage Categories"
