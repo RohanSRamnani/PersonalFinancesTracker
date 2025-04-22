@@ -25,9 +25,8 @@ def main():
     
     # Title and description
     st.title("Dashboard")
-    st.markdown("""
-    Your complete financial picture in one place. Track spending, budget, and measure progress over time.
-    """)
+    # Simple subtitle without extra text
+    st.markdown("Your complete financial picture in one place.")
     
     # Load transactions from database
     transactions = load_from_database(st.session_state.db_path)
@@ -187,52 +186,14 @@ def main():
         else:
             st.info("Import your financial data to see an overview of your finances.")
     
-    # Navigation instructions
-    if transactions.empty:
-        # Display welcome message for new users
-        st.markdown("""
-        ## How to Use This App
-        
-        1. **Import Data**: Upload financial statements from Wells Fargo, Chase, Bank of America, Apple Pay, or Schwab
-        2. **Categorize Transactions**: The app will automatically categorize your transactions based on descriptions
-        3. **Analyze Spending**: Visualize your spending patterns by category and over time
-        4. **Create Budgets**: Set up budgets and track your actual spending against them
-        """)
+    # No welcome message or instructions as requested
     
-    # Quick links for easy navigation
+    # Quick links for easy navigation - only keeping the Import Data button
     st.subheader("Quick Navigation")
     
-    # Create a horizontal layout for the links
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("📊 Spending Analysis", use_container_width=True):
-            st.switch_page("pages/1_spending_analysis.py")
-        if st.button("🏦 Manage Accounts", use_container_width=True):
-            st.switch_page("pages/4_accounts.py")
-    
-    with col2:
-        if st.button("📝 View Transactions", use_container_width=True):
-            st.switch_page("pages/2_transaction_view.py")
-        if st.button("📥 Import Data", use_container_width=True):
-            st.switch_page("pages/5_import_data.py")
-    
-    with col3:
-        if st.button("💰 Budgeting", use_container_width=True):
-            st.switch_page("pages/3_budgeting.py")
-        if st.button("🏷️ Manage Categories", use_container_width=True):
-            st.switch_page("pages/6_manage_categories.py")
-    
-    st.markdown("""
-    ## Get Started
-    
-    Use the sidebar navigation to:
-    - Import financial statements
-    - View and edit transactions
-    - Analyze your spending patterns
-    - Create and track budgets
-    - Manage custom categories
-    """)
+    # Just a single button for Import Data
+    if st.button("📥 Import Data", use_container_width=True):
+        st.switch_page("pages/5_import_data.py")
 
 if __name__ == "__main__":
     main()
