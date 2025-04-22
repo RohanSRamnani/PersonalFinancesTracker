@@ -191,7 +191,7 @@ def main():
     
     # Button to import data
     if st.button("📥 Import Data", use_container_width=True):
-        st.switch_page("utils/pages/import_data.py")
+        st.switch_page("pages/.5_import_data.py")
 
 if __name__ == "__main__":
     main()
