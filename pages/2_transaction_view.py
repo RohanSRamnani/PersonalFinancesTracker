@@ -105,7 +105,12 @@ def main():
     display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
     
     # Pagination
-    rows_per_page = st.slider("Rows per page", min_value=10, max_value=100, value=20, step=10.0)  # Ensure step is float to match min/max values
+    # Convert all values to float to ensure type consistency
+    rows_per_page = st.slider("Rows per page", 
+                           min_value=float(10), 
+                           max_value=float(100), 
+                           value=float(20), 
+                           step=float(10))  # All values must be the same type
     total_pages = (len(filtered_transactions) - 1) // rows_per_page + 1
     
     if 'current_page' not in st.session_state:
