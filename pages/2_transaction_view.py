@@ -62,12 +62,22 @@ def main():
     min_amount = float(transactions['amount'].min())
     max_amount = float(transactions['amount'].max())
     
+    # Calculate an appropriate step size based on the range
+    range_size = max_amount - min_amount
+    # Make step size proportional to the range, with a minimum of 0.01
+    step_size = max(0.01, range_size / 100.0) 
+    # Round to a nice value
+    if step_size > 1:
+        step_size = round(step_size)
+    else:
+        step_size = round(step_size * 100) / 100  # Round to 2 decimal places
+    
     amount_range = st.sidebar.slider(
         "Amount Range", 
         min_value=min_amount,
         max_value=max_amount,
         value=(min_amount, max_amount),
-        step=10.0
+        step=step_size
     )
     
     filtered_transactions = filtered_transactions[
