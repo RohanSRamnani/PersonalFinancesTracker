@@ -94,17 +94,19 @@ def main():
         if not balances_df.empty:
             account_to_delete = st.selectbox("Select Account to Delete", balances_df['account_name'].tolist(), key="delete_account")
             
-            if st.button("Delete Account"):
-                confirm = st.checkbox("I understand this will permanently delete the account", key="confirm_delete")
-                
-                if confirm:
+            # First ask for confirmation with a checkbox
+            confirm_delete = st.checkbox("I understand this will permanently delete the account", key="confirm_delete")
+            
+            # Only show delete button if checkbox is checked
+            if confirm_delete:
+                if st.button("Delete Account", type="primary", use_container_width=True):
                     if delete_account(account_to_delete, st.session_state.db_path):
                         st.success(f"Account {account_to_delete} deleted successfully")
                         st.rerun()
                     else:
                         st.error(f"Error deleting account {account_to_delete}")
-                else:
-                    st.warning("Please confirm deletion by checking the box")
+            else:
+                st.button("Delete Account", disabled=True, use_container_width=True)
         else:
             st.info("No accounts to delete")
 
