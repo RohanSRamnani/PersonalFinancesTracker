@@ -59,26 +59,21 @@ def main():
         filtered_transactions = filtered_transactions[filtered_transactions['source'] == selected_source]
     
     # Amount filter
+    # Use two separate number inputs instead of a slider to avoid step issues
+    st.sidebar.markdown("### Amount Range")
+    col1, col2 = st.sidebar.columns(2)
+    
     min_amount = float(transactions['amount'].min())
     max_amount = float(transactions['amount'].max())
     
-    # Calculate an appropriate step size based on the range
-    range_size = max_amount - min_amount
-    # Make step size proportional to the range, with a minimum of 0.01
-    step_size = max(0.01, range_size / 100.0) 
-    # Round to a nice value, but ensure it's a float
-    if step_size > 1:
-        step_size = float(round(step_size))
-    else:
-        step_size = round(step_size * 100) / 100.0  # Round to 2 decimal places, explicitly as float
+    with col1:
+        amount_min = st.number_input("Min", value=min_amount, step=0.01)
     
-    amount_range = st.sidebar.slider(
-        "Amount Range", 
-        min_value=min_amount,
-        max_value=max_amount,
-        value=(min_amount, max_amount),
-        step=step_size
-    )
+    with col2:
+        amount_max = st.number_input("Max", value=max_amount, step=0.01)
+    
+    # Use the min/max values as our filter
+    amount_range = (amount_min, amount_max)
     
     filtered_transactions = filtered_transactions[
         (filtered_transactions['amount'] >= amount_range[0]) & 
@@ -104,20 +99,22 @@ def main():
     display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
     display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
     
-    # Pagination
-    # Convert all values to float to ensure type consistency
-    rows_per_page = st.slider("Rows per page", 
-                           min_value=float(10), 
-                           max_value=float(100), 
-                           value=float(20), 
-                           step=float(10))  # All values must be the same type
+    # Pagination - use number input instead of slider to avoid step/value conflicts
+    col_rows, col_pages = st.columns([1, 4])
+    
+    with col_rows:
+        rows_options = [10, 20, 50, 100]
+        rows_per_page = st.selectbox("Rows per page", options=rows_options, index=1)
+    
+    # Convert to integer to ensure no float-related indexing issues
+    rows_per_page = int(rows_per_page)
     total_pages = (len(filtered_transactions) - 1) // rows_per_page + 1
     
     if 'current_page' not in st.session_state:
         st.session_state.current_page = 1
     
     def set_page(page_num):
-        st.session_state.current_page = page_num
+        st.session_state.current_page = int(page_num)  # Ensure integer
     
     # Pagination controls
     col1, col2, col3 = st.columns([1, 3, 1])
@@ -128,25 +125,29 @@ def main():
     
     with col2:
         if total_pages > 1:
-            # Create page numbers that are valid with the slider constraints
-            # Instead of using options, use min_value, max_value, and value directly
-            # Convert all values to float to ensure type consistency
-            page_num = st.slider("Page", 
-                              min_value=float(1), 
-                              max_value=float(total_pages), 
-                              value=float(st.session_state.current_page), 
-                              step=1.0)  # Use float for step
-            if page_num != st.session_state.current_page:
-                set_page(page_num)
+            # Use radio buttons or selectbox instead of a slider
+            page_options = list(range(1, total_pages + 1))
+            page_index = page_options.index(st.session_state.current_page) if st.session_state.current_page in page_options else 0
+            
+            # Only show a select box if we have a reasonable number of pages
+            if total_pages <= 20:  
+                page_num = st.selectbox("Page", options=page_options, index=page_index)
+            else:
+                # For larger datasets, use number input with min/max constraints
+                page_num = st.number_input("Page", min_value=1, max_value=total_pages, 
+                                       value=st.session_state.current_page, step=1)
+            
+            if int(page_num) != st.session_state.current_page:
+                set_page(int(page_num))
     
     with col3:
         if st.button("Next"):
             if st.session_state.current_page < total_pages:
                 set_page(st.session_state.current_page + 1)
     
-    # Calculate start and end indices for pagination
-    start_idx = (st.session_state.current_page - 1) * rows_per_page
-    end_idx = min(start_idx + rows_per_page, len(filtered_transactions))
+    # Calculate start and end indices for pagination - ensure integers
+    start_idx = int((st.session_state.current_page - 1) * rows_per_page)
+    end_idx = int(min(start_idx + rows_per_page, len(filtered_transactions)))
     
     # Display paginated transactions
     # Set the ID as the index but don't show it as a column
