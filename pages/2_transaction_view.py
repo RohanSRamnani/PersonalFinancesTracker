@@ -112,9 +112,11 @@ def main():
                 set_page(st.session_state.current_page - 1)
     
     with col2:
-        page_nums = [i+1 for i in range(total_pages)]
         if total_pages > 1:
-            page_num = st.select_slider("Page", options=page_nums, value=st.session_state.current_page)
+            # Create page numbers that are valid with the slider constraints
+            # Instead of using options, use min_value, max_value, and value directly
+            page_num = st.slider("Page", min_value=1, max_value=total_pages, 
+                              value=st.session_state.current_page, step=1)
             if page_num != st.session_state.current_page:
                 set_page(page_num)
     
