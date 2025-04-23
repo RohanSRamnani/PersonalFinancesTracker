@@ -66,11 +66,11 @@ def main():
     range_size = max_amount - min_amount
     # Make step size proportional to the range, with a minimum of 0.01
     step_size = max(0.01, range_size / 100.0) 
-    # Round to a nice value
+    # Round to a nice value, but ensure it's a float
     if step_size > 1:
-        step_size = round(step_size)
+        step_size = float(round(step_size))
     else:
-        step_size = round(step_size * 100) / 100  # Round to 2 decimal places
+        step_size = round(step_size * 100) / 100.0  # Round to 2 decimal places, explicitly as float
     
     amount_range = st.sidebar.slider(
         "Amount Range", 
@@ -105,7 +105,7 @@ def main():
     display_df['amount'] = display_df['amount'].map('${:,.2f}'.format)
     
     # Pagination
-    rows_per_page = st.slider("Rows per page", min_value=10, max_value=100, value=20, step=10)
+    rows_per_page = st.slider("Rows per page", min_value=10, max_value=100, value=20, step=10.0)  # Ensure step is float to match min/max values
     total_pages = (len(filtered_transactions) - 1) // rows_per_page + 1
     
     if 'current_page' not in st.session_state:
@@ -125,8 +125,12 @@ def main():
         if total_pages > 1:
             # Create page numbers that are valid with the slider constraints
             # Instead of using options, use min_value, max_value, and value directly
-            page_num = st.slider("Page", min_value=1, max_value=total_pages, 
-                              value=st.session_state.current_page, step=1)
+            # Convert all values to float to ensure type consistency
+            page_num = st.slider("Page", 
+                              min_value=float(1), 
+                              max_value=float(total_pages), 
+                              value=float(st.session_state.current_page), 
+                              step=1.0)  # Use float for step
             if page_num != st.session_state.current_page:
                 set_page(page_num)
     
