@@ -35,7 +35,7 @@ def initialize_account_balances(db_path='finance_data.db'):
 
 def get_account_balances(db_path='finance_data.db'):
     """
-    Get all account balance
+    Get all account balances
     
     Parameters:
         db_path (str): Path to the SQLite database
